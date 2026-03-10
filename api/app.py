@@ -1,18 +1,25 @@
-from fastapi import FastAPI
 import joblib
-import numpy as np
+import pandas as pd
+from fastapi import FastAPI
 
 app = FastAPI()
 
 model = joblib.load("models/model.pkl")
 
+
 @app.get("/")
 def home():
-    return {"message": "MLOps anomaly detection API"}
+    return {"message": "Weather anomaly detection API"}
+
 
 @app.post("/predict")
-def predict(data: list):
-    data = np.array(data).reshape(1,-1)
-    pred = model.predict(data)
+def predict(temp: float, humidity: float):
+    X = pd.DataFrame([{"temperature": temp, "humidity": humidity}])
 
-    return {"prediction": int(pred[0])}
+    pred = model.predict(X)
+    score = model.decision_function(X)
+
+    return {
+        "prediction": int(pred[0]),
+        "anomaly_score": float(score[0]),
+    }

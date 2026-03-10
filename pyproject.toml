@@ -1,0 +1,30 @@
+[project]
+name = "mlops-anomaly-detection"
+version = "0.1.0"
+description = "MLOps anomaly detection project"
+requires-python = ">=3.10"
+
+dependencies = [
+    "pandas",
+    "numpy",
+    "scikit-learn",
+    "mlflow",
+    "fastapi",
+    "uvicorn",
+    "pytest",
+    "joblib",
+    "ruff"
+]
+
+[tool.ruff]
+line-length = 100
+
+[tool.ruff.lint]
+select = ["E","F","I"]
+
+[dependency-groups]
+dev = [
+    "pytest",
+    "ruff",
+    "pre-commit"
+]
