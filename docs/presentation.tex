@@ -331,21 +331,19 @@
   \end{column}
 
   \begin{column}{0.48\textwidth}
-    \textbf{\faDesktop\hspace{4pt}Streamlit --- 2 onglets}\\[6pt]
-    \small
-    \textbf{Onglet 1 --- Pr\'ediction}
-    \begin{itemize}\setlength\itemsep{2pt}
-      \item 17 champs capteurs (sliders)
-      \item Appel API $\to$ diagnostic 4 composants
+    \textbf{\faDesktop\hspace{4pt}Streamlit --- 2 onglets}\\[4pt]
+    \centering
+    \includegraphics[width=\linewidth, height=3.5cm, keepaspectratio]{webapp2.jpeg}\\[-2pt]
+    {\scriptsize R\'esultat de pr\'ediction --- 4 composants diagnostiqu\'es}
+
+    \vspace{3pt}
+    \raggedright
+    \scriptsize
+    \begin{itemize}\setlength\itemsep{1pt}
+      \item \textbf{Onglet 1 :} 17 capteurs $\to$ diagnostic 4 composants
+      \item \textbf{Onglet 2 :} M\'etriques F1, matrices de confusion
     \end{itemize}
-    \vspace{6pt}
-    \textbf{Onglet 2 --- \'Evaluation du mod\`ele}
-    \begin{itemize}\setlength\itemsep{2pt}
-      \item M\'etriques par cible (F1, accuracy, precision, recall)
-      \item Matrices de confusion interactives
-      \item Rapports de classification complets
-    \end{itemize}
-    {\scriptsize\color{tptgray} Source : \texttt{reports/model\_metrics.json}\\g\'en\'er\'e par \texttt{src/train.py} \`a chaque entra\^inement}
+    {\scriptsize\color{tptgray} Source : \texttt{reports/model\_metrics.json}}
   \end{column}
 \end{columns}
 
@@ -407,44 +405,39 @@
 \begin{frame}{Monitoring \& Alerting}
 
 \begin{columns}[T]
-  \begin{column}{0.32\textwidth}
-    \textbf{\faChartLine\hspace{4pt}Prometheus}\\[6pt]
-    \small
-    \begin{itemize}\setlength\itemsep{3pt}
-      \item Scrape endpoint \texttt{/metrics} de l'API
-      \item M\'etriques collect\'ees :\\
-        {\scriptsize --- Nombre de requ\^etes\\--- Latence par endpoint\\--- Erreurs HTTP\\--- Compteurs de pr\'edictions}
-      \item Intervalle : 15s
+  \begin{column}{0.52\textwidth}
+    \textbf{\faChartBar\hspace{4pt}Dashboard Grafana}\\[4pt]
+    \centering
+    \includegraphics[width=\linewidth, height=4cm, keepaspectratio]{grafana1.jpeg}\\[-1pt]
+    {\tiny MLOps Overview --- req/s, latence p95, error rate, predictions/min}
+
+    \vspace{3pt}
+    \raggedright
+    \scriptsize
+    \begin{itemize}\setlength\itemsep{1pt}
+      \item Dashboard \textbf{auto-provisionn\'e} au \texttt{compose up}
+      \item Datasource Prometheus configur\'ee automatiquement
     \end{itemize}
   \end{column}
 
-  \begin{column}{0.32\textwidth}
-    \textbf{\faChartBar\hspace{4pt}Grafana}\\[6pt]
-    \small
-    \begin{itemize}\setlength\itemsep{3pt}
-      \item Dashboard \textbf{auto-provisionn\'e}\\{\scriptsize Au \texttt{compose up}, z\'ero\\config manuelle}
-      \item Panels :
-        {\scriptsize\begin{itemize}\setlength\itemsep{1pt}
-          \item Taux de requ\^etes
-          \item Latence p50/p95/p99
-          \item Taux d'erreurs
-          \item \'Etat des services
-        \end{itemize}}
-      \item Datasource Prometheus\\{\scriptsize automatiquement configur\'ee}
+  \begin{column}{0.45\textwidth}
+    \textbf{\faChartLine\hspace{4pt}Prometheus}\\[3pt]
+    \scriptsize
+    \begin{itemize}\setlength\itemsep{2pt}
+      \item Scrape \texttt{/metrics} toutes les 15s
+      \item M\'etriques : requ\^etes, latence, erreurs HTTP, compteurs de pr\'edictions
     \end{itemize}
-  \end{column}
 
-  \begin{column}{0.32\textwidth}
-    \textbf{\faBell\hspace{4pt}Alerting}\\[6pt]
-    \small
-    \begin{itemize}\setlength\itemsep{3pt}
-      \item \textbf{Airflow callbacks}\\{\scriptsize Notification email en cas\\d'\'echec d'un DAG}
-      \item M\'ecanisme :\\
-        {\scriptsize \texttt{on\_failure\_callback}\\appelle \texttt{failure\_callback()}\\$\to$ email avec DAG, task, date}
-      \item Configurable par DAG\\{\scriptsize SMTP param\'etrable dans\\\texttt{airflow.cfg}}
-    \end{itemize}
     \vspace{4pt}
-    {\scriptsize\color{tptgray}\faArrowRight\hspace{4pt} Bonus barème \#17}
+    \textbf{\faBell\hspace{4pt}Alerting}\\[3pt]
+    \scriptsize
+    \begin{itemize}\setlength\itemsep{2pt}
+      \item \textbf{Airflow callbacks} : email en cas d'\'echec DAG
+      \item \texttt{on\_failure\_callback} $\to$ email avec DAG, task, date
+      \item SMTP configurable dans \texttt{airflow.cfg}
+    \end{itemize}
+    \vspace{2pt}
+    {\scriptsize\color{tptgray}\faArrowRight\hspace{4pt} Bonus bar\`eme \#12 + \#17}
   \end{column}
 \end{columns}
 
