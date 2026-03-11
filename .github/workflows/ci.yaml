@@ -29,7 +29,23 @@ jobs:
       - name: Run tests
         env:
           MLFLOW_TRACKING_URI: ./mlruns
-        run: uv run pytest --cov=src --cov-branch --cov-fail-under=0 --cov-report=xml
+        run: |
+          uv run pytest \
+            --cov=src --cov-branch --cov-fail-under=0 \
+            --cov-report=xml \
+            --junitxml=pytest-report.xml
+
+      - name: Generate badges
+        run: python scripts/generate_badges.py --coverage coverage.xml --junit pytest-report.xml --output badges
+
+      - name: Publish badges to GitHub Pages
+        if: github.ref == 'refs/heads/main'
+        uses: peaceiris/actions-gh-pages@v4
+        with:
+          github_token: ${{ secrets.GITHUB_TOKEN }}
+          publish_dir: badges
+          destination_dir: badges
+          keep_files: true
 
       - name: Lint with Ruff
         run: uv run ruff check .

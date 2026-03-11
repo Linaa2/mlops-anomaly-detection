@@ -14,6 +14,12 @@
   </a>
   <img src="https://img.shields.io/badge/Python-3.11-3776AB?logo=python&logoColor=white" alt="Python 3.11">
   <img src="https://img.shields.io/badge/MLflow-tracking-0194E2?logo=mlflow&logoColor=white" alt="MLflow">
+  <a href="https://github.com/Linaa2/mlops-anomaly-detection/actions/workflows/ci.yaml">
+    <img src="https://img.shields.io/endpoint?url=https://linaa2.github.io/mlops-anomaly-detection/badges/tests.json&logo=pytest&logoColor=white" alt="Tests">
+  </a>
+  <a href="https://github.com/Linaa2/mlops-anomaly-detection/actions/workflows/ci.yaml">
+    <img src="https://img.shields.io/endpoint?url=https://linaa2.github.io/mlops-anomaly-detection/badges/coverage.json&logo=codecov&logoColor=white" alt="Couverture">
+  </a>
 </p>
 
 ---
