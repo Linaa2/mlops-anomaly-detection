@@ -2,66 +2,49 @@ from pathlib import Path
 
 import joblib
 import pandas as pd
-from sklearn.ensemble import IsolationForest
-from sklearn.preprocessing import StandardScaler
+from sklearn.ensemble import RandomForestClassifier
+from sklearn.metrics import classification_report, confusion_matrix
+from sklearn.model_selection import train_test_split
+from sklearn.multioutput import MultiOutputClassifier
 
 INPUT_PATH = "data/processed/hydraulic_clean.csv"
 MODEL_PATH = "models/model.pkl"
-SCALER_PATH = "models/scaler.pkl"
-OUTPUT_PATH = "data/processed/hydraulic_with_predictions.csv"
 
 FEATURES = [
-    "PS1",
-    "PS2",
-    "PS3",
-    "TS1",
-    "TS2",
-    "TS3",
-    "TS4",
+    "PS1", "PS2", "PS3", "PS4", "PS5", "PS6",
+    "EPS1",
+    "FS1", "FS2",
+    "TS1", "TS2", "TS3", "TS4",
     "VS1",
-    "CE",
-    "CP",
+    "CE", "CP", "SE",
 ]
+
+TARGETS = ["cooler_condition", "valve_condition", "pump_leakage", "accumulator_pressure"]
 
 
 def train() -> None:
     df = pd.read_csv(INPUT_PATH)
 
-    X = df[FEATURES]
+    X = df[FEATURES].values
+    y = df[TARGETS].values
 
-    scaler = StandardScaler()
-    X_scaled = scaler.fit_transform(X)
-
-    model = IsolationForest(
-        contamination=0.05,
-        random_state=42,
+    X_train, X_test, y_train, y_test = train_test_split(
+        X, y, test_size=0.2, random_state=42, stratify=y[:, 0]
     )
-    model.fit(X_scaled)
 
-    preds = model.predict(X_scaled)
-    scores = model.decision_function(X_scaled)
+    model = MultiOutputClassifier(RandomForestClassifier(n_estimators=100, random_state=42))
+    model.fit(X_train, y_train)
 
-    results = df.copy()
-    results["prediction"] = preds
-    results["anomaly_score"] = scores
-
-    anomaly_count = int((preds == -1).sum())
-    total_count = len(preds)
-    anomaly_ratio = anomaly_count / total_count
+    y_pred = model.predict(X_test)
 
     Path("models").mkdir(parents=True, exist_ok=True)
-    Path("data/processed").mkdir(parents=True, exist_ok=True)
-
     joblib.dump(model, MODEL_PATH)
-    joblib.dump(scaler, SCALER_PATH)
-    results.to_csv(OUTPUT_PATH, index=False)
 
-    print(f"Model saved to: {MODEL_PATH}")
-    print(f"Scaler saved to: {SCALER_PATH}")
-    print(f"Predictions saved to: {OUTPUT_PATH}")
-    print(f"Total observations: {total_count}")
-    print(f"Detected anomalies: {anomaly_count}")
-    print(f"Anomaly ratio: {anomaly_ratio:.2%}")
+    print(f"Model saved to: {MODEL_PATH}\n")
+    for i, target in enumerate(TARGETS):
+        print(f"── {target} ──")
+        print(classification_report(y_test[:, i], y_pred[:, i], digits=3))
+        print(f"Confusion matrix:\n{confusion_matrix(y_test[:, i], y_pred[:, i])}\n")
 
 
 if __name__ == "__main__":
