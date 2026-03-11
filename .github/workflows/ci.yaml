@@ -8,8 +8,6 @@ on:
 jobs:
   build:
     runs-on: ubuntu-latest
-    permissions:
-      contents: write
 
     steps:
       - name: Checkout repository
@@ -38,7 +36,7 @@ jobs:
             --junitxml=pytest-report.xml
 
       - name: Generate badges
-        run: python scripts/generate_badges.py --coverage coverage.xml --junit pytest-report.xml --output badges
+        run: uv run python scripts/generate_badges.py --coverage coverage.xml --junit pytest-report.xml --output badges
 
       - name: Publish badges to GitHub Pages
         if: github.ref == 'refs/heads/main'
