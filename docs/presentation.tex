@@ -260,51 +260,48 @@
 \begin{frame}[fragile]{Int\'egration Continue (CI)}
 
 \begin{columns}[T]
-  \begin{column}{0.48\textwidth}
-    \textbf{D\'eclench\'ee \`a chaque push \& PR}\\[4pt]
+  \begin{column}{0.45\textwidth}
+    {\small\textbf{D\'eclench\'ee \`a chaque push \& PR}}\\[2pt]
     \begin{tikzpicture}[
-      node distance=0.25cm,
-      cibox/.style={draw, rounded corners=2pt, minimum width=3.3cm, minimum height=0.45cm, font=\small, fill=okgreen!8, draw=okgreen!50, inner sep=2pt},
-      arr/.style={-{Stealth[length=3pt]}, okgreen!60},
+      node distance=0.15cm,
+      cibox/.style={draw, rounded corners=2pt, minimum width=2.8cm, minimum height=0.35cm, font=\scriptsize, fill=okgreen!8, draw=okgreen!50, inner sep=2pt},
+      arr/.style={-{Stealth[length=2pt]}, okgreen!60},
     ]
-      \node[cibox] (lint) {\faCheck\hspace{4pt}ruff check (linting)};
-      \node[cibox, below=of lint] (test) {\faCheck\hspace{4pt}pytest (26 tests)};
-      \node[cibox, below=of test] (trivy) {\faCheck\hspace{4pt}Trivy (vuln\'erabilit\'es)};
+      \node[cibox] (lint) {\faCheck\hspace{2pt}ruff check};
+      \node[cibox, below=of lint] (test) {\faCheck\hspace{2pt}pytest (26 tests)};
+      \node[cibox, below=of test] (trivy) {\faCheck\hspace{2pt}Trivy (vuln.)};
       \draw[arr] (lint)--(test);
       \draw[arr] (test)--(trivy);
     \end{tikzpicture}
 
-    \vspace{4pt}
-    \textbf{26 tests en 3 suites :}
-    \small
-    \begin{tabular}{@{}lrp{3cm}@{}}
+    \vspace{2pt}
+    {\scriptsize\textbf{26 tests en 3 suites :}}
+    \tiny
+    \begin{tabular}{@{}lrl@{}}
       \toprule
       \textbf{Suite} & \textbf{\#} & \textbf{V\'erifie} \\
       \midrule
-      DAGs & 9 & {\scriptsize structure, task IDs, deps} \\
-      Model & 7 & {\scriptsize entra\^inement, F1, features} \\
-      Preproc. & 10 & {\scriptsize merge, filtre, NaN} \\
+      DAGs & 9 & structure, task IDs, deps \\
+      Model & 7 & entra\^inement, F1, features \\
+      Preproc. & 10 & merge, filtre, NaN \\
       \bottomrule
     \end{tabular}
+
+    \vspace{3pt}
+    \scriptsize
+    \textbf{Outils :} \texttt{uv} + \texttt{ruff} + Trivy + Dependabot\\[1pt]
+    \textbf{Workflow :} Feature branches $\to$ PR $\to$ main\\[1pt]
+    {\color{tptgray}CI gate : merge bloqu\'e si rouge. 30+ PRs.}
   \end{column}
 
-  \begin{column}{0.48\textwidth}
-    \textbf{Outils \& pratiques :}\\[4pt]
-    \small
-    \begin{itemize}\setlength\itemsep{2pt}
-      \item \textbf{Gestionnaire :} \texttt{uv}\\{\scriptsize Rapide, lockfile d\'eterministe, reproductible}
-      \item \textbf{Linting :} \texttt{ruff}\\{\scriptsize V\'erification PEP8 + import order}
-      \item \textbf{S\'ecurit\'e :} Trivy + Dependabot\\{\scriptsize Scan vuln\'erabilit\'es images \& deps}
-      \item \textbf{CI gate obligatoire}\\{\scriptsize Branch protection : merge bloqu\'e si CI rouge}
-    \end{itemize}
+  \begin{column}{0.52\textwidth}
+    \centering
+    \includegraphics[width=\linewidth, height=3.2cm, keepaspectratio]{ci.png}\\[-1pt]
+    {\tiny Pipeline CI GitHub Actions --- checks verts}
 
-    \vspace{4pt}
-    \textbf{Workflow Git :}
-    \begin{itemize}\small\setlength\itemsep{1pt}
-      \item Feature branches $\to$ PR $\to$ main
-      \item Conventional commits
-      \item 30+ PRs merg\'ees, reviews Copilot
-    \end{itemize}
+    \vspace{2pt}
+    \includegraphics[width=\linewidth, height=2.2cm, keepaspectratio]{dependabot.png}\\[-1pt]
+    {\tiny Dependabot --- mises \`a jour s\'ecurit\'e automatiques}
   \end{column}
 \end{columns}
 
@@ -318,16 +315,19 @@
 
 \begin{columns}[T]
   \begin{column}{0.48\textwidth}
-    \textbf{\faServer\hspace{4pt}FastAPI}\\[6pt]
-    \small
-    \begin{itemize}\setlength\itemsep{4pt}
-      \item \texttt{POST /predict}\\{\scriptsize Validation Pydantic : 17 capteurs $\to$ 4 \'etats}
-      \item \texttt{GET /health}\\{\scriptsize Sonde readiness pour K8s}
-      \item \texttt{GET /metrics}\\{\scriptsize Endpoint Prometheus (compteurs, latence)}
-      \item \texttt{GET /docs}\\{\scriptsize Swagger auto-g\'en\'er\'e}
+    \textbf{\faServer\hspace{4pt}FastAPI}\\[4pt]
+    \centering
+    \includegraphics[width=\linewidth]{api.jpeg}\\[-2pt]
+    {\scriptsize Swagger UI --- 4 endpoints document\'es}
+
+    \vspace{3pt}
+    \raggedright
+    \scriptsize
+    \begin{itemize}\setlength\itemsep{1pt}
+      \item \texttt{POST /predict} --- 17 capteurs $\to$ 4 \'etats
+      \item \texttt{GET /health, /metrics, /docs}
     \end{itemize}
-    \vspace{6pt}
-    {\scriptsize\color{tptgray}\faArrowRight\hspace{4pt} Pourquoi FastAPI ? Async, typage natif, Swagger inclus, \'ecosyst\`eme Pydantic}
+    {\scriptsize\color{tptgray}\faArrowRight\hspace{4pt} Async, Pydantic, Swagger inclus}
   \end{column}
 
   \begin{column}{0.48\textwidth}
@@ -387,24 +387,14 @@
     \end{itemize}
 
     \vspace{4pt}
-    \textbf{Pipeline CD} {\small (push sur main) :}\\[2pt]
-    \footnotesize
-    \begin{tikzpicture}[
-      node distance=0.2cm,
-      cdbox/.style={draw, rounded corners=2pt, minimum width=3.2cm, minimum height=0.38cm, font=\tiny, fill=tptlight!10, draw=tptlight!50, inner sep=2pt},
-      arr/.style={-{Stealth[length=3pt]}, tptlight!60},
-      skipbox/.style={draw, rounded corners=2pt, minimum width=3.2cm, minimum height=0.38cm, font=\tiny, fill=tptgray!10, draw=tptgray!40, text=tptgray, inner sep=2pt},
-    ]
-      \node[cdbox] (build) {Build images Docker};
-      \node[cdbox, below=of build] (push) {Push GHCR + DockerHub};
-      \node[cdbox, below=of push] (check) {check-deploy (secret?)};
-      \node[skipbox, below=of check] (deploy) {\faForward\hspace{2pt}kubectl apply (skip)};
-      \draw[arr] (build)--(push); \draw[arr] (push)--(check);
-      \draw[arr, dashed, tptgray!60] (check)--(deploy);
-    \end{tikzpicture}
+    \textbf{Pipeline CD} {\small (push sur main) :}\\[4pt]
+    \centering
+    \includegraphics[width=\linewidth]{cd.png}\\[-2pt]
+    {\scriptsize GitHub Actions CD --- build, push, check-deploy}
 
     \vspace{2pt}
-    {\scriptsize\color{tptgray} Double registry : redondance GHCR + DockerHub}
+    \raggedright
+    {\scriptsize\color{tptgray} Double registry : GHCR + DockerHub\\D\'eploy K8s conditionnel au secret \texttt{KUBECONFIG}}
   \end{column}
 \end{columns}
 
@@ -506,12 +496,11 @@
       \bottomrule
     \end{tabular}
 
-    \vspace{8pt}
-    \textbf{Stack :}\\[2pt]
-    {\scriptsize Python 3.11 $\cdot$ scikit-learn $\cdot$ MLflow\\
-    Airflow $\cdot$ FastAPI $\cdot$ Streamlit\\
-    Docker $\cdot$ K8s $\cdot$ GitHub Actions\\
-    Prometheus $\cdot$ Grafana $\cdot$ uv}
+    \vspace{4pt}
+    \textbf{Documentation auto-g\'en\'er\'ee :}\\[2pt]
+    \centering
+    \includegraphics[width=\linewidth]{sphinx_docs.png}\\[-2pt]
+    {\scriptsize Sphinx --- doc technique g\'en\'er\'ee depuis le code}
   \end{column}
 \end{columns}
 
