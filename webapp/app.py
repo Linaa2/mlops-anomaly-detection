@@ -160,12 +160,12 @@ with tab1:
     for col, (name, values) in zip(preset_cols, PRESETS.items()):
         with col:
             if st.button(name, use_container_width=True):
-                st.session_state["preset_values"] = values
                 st.session_state["preset_name"] = name
+                for feat, val in values.items():
+                    st.session_state[f"input_{feat}"] = float(val)
                 st.rerun()
 
     preset_name = st.session_state.get("preset_name", "Système nominal")
-    current_values = st.session_state.get("preset_values", PRESETS["Système nominal"])
 
     st.caption(f"**{preset_name}** — {PRESET_DESCRIPTIONS[preset_name]}")
     st.divider()
@@ -186,9 +186,10 @@ with tab1:
             gcols = st.columns(len(group_features))
             for gcol, feat in zip(gcols, group_features):
                 with gcol:
+                    default = float(PRESETS["Système nominal"].get(feat, 0.0))
                     inputs[feat] = st.number_input(
                         feat,
-                        value=float(current_values.get(feat, 0.0)),
+                        value=st.session_state.get(f"input_{feat}", default),
                         format="%.4f",
                         key=f"input_{feat}",
                     )
