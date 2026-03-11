@@ -24,3 +24,7 @@ __pycache__/
 *.pyc
 .venv/
 k8s/secrets.yaml
+
+
+mlruns/
+mlflow.db
