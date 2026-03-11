@@ -28,3 +28,5 @@ k8s/secrets.yaml
 
 mlruns/
 mlflow.db
+
+*.db
