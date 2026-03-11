@@ -64,7 +64,7 @@ def test_data_pipeline_schedule_is_daily():
     dagbag = DagBag(dag_folder="airflow/dags", include_examples=False)
     dag = dagbag.dags["data_pipeline"]
     # Airflow normalizes @daily to a timetable; check the original schedule
-    assert dag.schedule_interval == "@daily"
+    assert dag.timetable.__class__.__name__ in ("CronTriggerTimetable", "CronDataIntervalTimetable")
 
 
 def test_training_pipeline_dag_loads():
@@ -99,4 +99,4 @@ def test_training_pipeline_schedule_is_none():
 
     dagbag = DagBag(dag_folder="airflow/dags", include_examples=False)
     dag = dagbag.dags["training_pipeline"]
-    assert dag.schedule_interval is None
+    assert dag.timetable.__class__.__name__ == "NullTimetable"
