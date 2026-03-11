@@ -21,3 +21,4 @@ mlflow/artifacts/
 __pycache__/
 *.pyc
 .venv/
+k8s/secrets.yaml
