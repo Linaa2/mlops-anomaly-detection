@@ -104,11 +104,11 @@ Pour chaque capteur et chaque cycle → extraire :
 ### Ce qui manque entièrement ❌
 - MLflow tracking + model registry (mentionné dans README mais absent du code)
 - `profile.txt` non utilisé → les labels de condition existent mais on fait de l'unsupervised
-- Airflow (aucun DAG)
-- Docker Compose
-- Kubernetes manifests
+- ~~Airflow (aucun DAG)~~ → **DONE** (Personne B)
+- ~~Docker Compose~~ → **DONE** (Personne D)
+- ~~Kubernetes manifests~~ → **DONE** (Personne D)
 - Tests substantiels (unitaires, intégration, e2e)
-- `.env.example`
+- ~~`.env.example`~~ → **DONE** (Personne D)
 
 ---
 
@@ -139,11 +139,13 @@ Pour chaque capteur et chaque cycle → extraire :
 - [ ] Tests unitaires + intégration API
 
 ### Personne D — Infra & DevOps
-- [ ] `docker-compose.yml` : Airflow + MLflow + FastAPI + Streamlit
-- [ ] Manifests K8s : `api-deployment.yaml`, `webapp-deployment.yaml`
-- [ ] GitHub Actions `cd.yml` : build → push DockerHub → deploy K8s
-- [ ] Séparation env `dev` (Docker Compose) vs `prod` (K8s)
-- [ ] Monitoring Prometheus + Grafana (bonus)
+- [x] `docker-compose.yml` : Airflow + MLflow + FastAPI + Streamlit + Prometheus + Grafana
+- [x] Manifests K8s : `api-deployment.yaml`, `webapp-deployment.yaml`
+- [x] GitHub Actions `cd.yml` : build → push DockerHub → deploy K8s
+- [x] Séparation env `dev` (Docker Compose) vs `prod` (K8s)
+- [x] `Dockerfile` API + WebApp
+- [x] `envs/.env.example`
+- [x] Monitoring Prometheus + Grafana (dashboards + provisioning)
 
 ---
 
@@ -161,7 +163,7 @@ Pour chaque capteur et chaque cycle → extraire :
 - [x] Structure dossiers de base (`src/`, `api/`, `webapp/`, `tests/`)
 - [x] CI GitHub Actions (ruff + pytest)
 - [ ] Créer branche `dev` pour le développement quotidien
-- [ ] Créer `.env.example` (MLFLOW_TRACKING_URI, API_URL, etc.)
+- [x] Créer `.env.example` (MLFLOW_TRACKING_URI, API_URL, etc.) → `envs/.env.example`
 - [ ] Décider : garder Isolation Forest (non-supervisé) OU passer à RF supervisé avec `profile.txt`
 
 ### Phase 1 — Core ML (objectifs 1-3)
@@ -193,11 +195,12 @@ Pour chaque capteur et chaque cycle → extraire :
 - [ ] Tests d'intégration (API + modèle)
 
 ### Phase 4 — Infra & CI/CD (objectifs 9)
-- [ ] `docker-compose.yml` : Airflow + MLflow + FastAPI + Streamlit
-- [ ] `Dockerfile.api` + `Dockerfile.webapp`
-- [ ] Manifests K8s : `api-deployment.yaml`, `webapp-deployment.yaml`
-- [ ] GitHub Actions `cd.yml` : build image → push DockerHub → deploy K8s
-- [ ] Séparer env `dev` (Docker Compose) vs `prod` (K8s) dans les workflows
+- [x] `docker-compose.yml` : Airflow + MLflow + FastAPI + Streamlit + Prometheus + Grafana
+- [x] `Dockerfile` API + WebApp
+- [x] Manifests K8s : `api-deployment.yaml`, `webapp-deployment.yaml`
+- [x] GitHub Actions `cd.yml` : build image → push DockerHub → deploy K8s
+- [x] Séparer env `dev` (Docker Compose) vs `prod` (K8s) dans les workflows
+- [x] `envs/.env.example`
 
 ### Phase 5 — Documentation & Tests (objectif 10)
 - [ ] Compléter le README (architecture, setup local, screenshots)
@@ -206,7 +209,7 @@ Pour chaque capteur et chaque cycle → extraire :
 - [x] Structure projet documentée
 
 ### Phase 6 — Bonus (si le temps le permet)
-- [ ] **Monitoring** : Prometheus scrape sur `/metrics` de FastAPI + dashboard Grafana
+- [x] **Monitoring** : Prometheus + Grafana dashboard + provisioning (config + dashboards)
 - [x] **Alerting mail** : callback Airflow `on_failure_callback` sur tous les DAGs
 - [ ] Rollback modèle via MLflow stages (Staging / Production / Archived)
 - [ ] Tests de charge Locust sur `/predict`
