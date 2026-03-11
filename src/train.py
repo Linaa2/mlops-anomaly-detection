@@ -3,9 +3,9 @@ from pathlib import Path
 import joblib
 import pandas as pd
 from sklearn.ensemble import RandomForestClassifier
-from sklearn.multioutput import MultiOutputClassifier
-from sklearn.model_selection import train_test_split
 from sklearn.metrics import classification_report, confusion_matrix
+from sklearn.model_selection import train_test_split
+from sklearn.multioutput import MultiOutputClassifier
 
 INPUT_PATH = "data/processed/hydraulic_clean.csv"
 MODEL_PATH = "models/model.pkl"

@@ -22,7 +22,9 @@ SENSORS = [
     "CE", "CP", "SE",
 ]
 
-PROFILE_COLS = ["cooler_condition", "valve_condition", "pump_leakage", "accumulator_pressure", "stable_flag"]
+PROFILE_COLS = [
+    "cooler_condition", "valve_condition", "pump_leakage", "accumulator_pressure", "stable_flag"
+]
 
 
 def download_dataset() -> None:
