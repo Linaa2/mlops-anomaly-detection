@@ -29,6 +29,9 @@ x-airflow-common: &airflow-common
     - ./airflow/dags:/opt/airflow/dags
     - airflow_logs:/opt/airflow/logs
     - ./src:/opt/airflow/src
+    - ./models:/opt/airflow/models
+    - ./reports:/opt/airflow/reports
+    - ./data:/opt/airflow/data
   depends_on:
     postgres:
       condition: service_healthy
