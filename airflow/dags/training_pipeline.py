@@ -27,8 +27,6 @@ MLFLOW_TRACKING_URI = os.getenv("MLFLOW_TRACKING_URI", "http://mlflow:5000")
 MODEL_NAME = "hydraulic-anomaly-detector"
 FEATURES_PATH = os.getenv("FEATURES_PATH", "data/processed/hydraulic_sample.csv")
 
-FEATURES = ["PS1", "PS2", "PS3", "TS1", "TS2", "TS3", "TS4", "VS1", "CE", "CP"]
-
 default_args = {
     "owner": "airflow",
     "retries": 1,
@@ -51,7 +49,7 @@ def _get_production_f1() -> float | None:
             return None
         run_id = versions[0].run_id
         run = client.get_run(run_id)
-        return float(run.data.metrics.get("f1_score", 0.0))
+        return float(run.data.metrics.get("f1_macro", 0.0))
     except MlflowException as exc:
         if "RESOURCE_DOES_NOT_EXIST" in str(exc):
             # Model not registered yet — treat as no Production model
@@ -61,38 +59,65 @@ def _get_production_f1() -> float | None:
 
 
 def train_and_log(**context) -> str:
-    """Train model, log to MLflow, register in Model Registry. Returns run_id via XCom."""
+    """Train multi-output model, log to MLflow, register in Model Registry.
+
+    Uses the same FEATURES/TARGETS as src/train.py but wraps training
+    with MLflow tracking and model registry.  Returns run_id via XCom.
+    """
     import mlflow
     import mlflow.sklearn
+    import numpy as np
     import pandas as pd
-    from sklearn.ensemble import IsolationForest
+    from sklearn.ensemble import RandomForestClassifier
     from sklearn.metrics import f1_score
-    from sklearn.preprocessing import StandardScaler
+    from sklearn.model_selection import train_test_split
+    from sklearn.multioutput import MultiOutputClassifier
+
+    from src.train import FEATURES, TARGETS
 
     mlflow.set_tracking_uri(MLFLOW_TRACKING_URI)
 
     df = pd.read_csv(FEATURES_PATH)
-    X = df[FEATURES].dropna()
 
-    scaler = StandardScaler()
-    X_scaled = scaler.fit_transform(X)
+    X = df[FEATURES].values
+    y = df[TARGETS].values
 
-    model = IsolationForest(contamination=0.05, random_state=42)
-    model.fit(X_scaled)
+    X_train, X_test, y_train, y_test = train_test_split(
+        X,
+        y,
+        test_size=0.2,
+        random_state=42,
+        stratify=y[:, 0],
+    )
 
-    preds = model.predict(X_scaled)
-    preds_bin = [0 if p == 1 else 1 for p in preds]
-    # Placeholder labels — Personne A will replace with profile.txt labels
-    y_placeholder = [0] * len(X)
-    f1 = float(f1_score(y_placeholder, preds_bin, average="macro", zero_division=0))
-    anomaly_ratio = sum(preds_bin) / len(preds_bin)
+    model = MultiOutputClassifier(
+        RandomForestClassifier(n_estimators=100, random_state=42),
+    )
+    model.fit(X_train, y_train)
+    y_pred = model.predict(X_test)
+
+    # Compute per-target macro F1 and overall macro average
+    per_target_f1 = {}
+    for i, target in enumerate(TARGETS):
+        per_target_f1[target] = float(
+            f1_score(y_test[:, i], y_pred[:, i], average="macro", zero_division=0)
+        )
+
+    f1_macro = float(np.mean(list(per_target_f1.values())))
 
     with mlflow.start_run() as run:
-        mlflow.log_param("contamination", 0.05)
+        mlflow.log_param("model_type", "MultiOutputClassifier(RandomForestClassifier)")
+        mlflow.log_param("n_estimators", 100)
         mlflow.log_param("features", FEATURES)
-        mlflow.log_param("n_samples", len(X))
-        mlflow.log_metric("f1_score", f1)
-        mlflow.log_metric("anomaly_ratio", anomaly_ratio)
+        mlflow.log_param("targets", TARGETS)
+        mlflow.log_param("n_samples", len(df))
+        mlflow.log_param("n_train", len(X_train))
+        mlflow.log_param("n_test", len(X_test))
+
+        mlflow.log_metric("f1_macro", f1_macro)
+        for target, f1_val in per_target_f1.items():
+            mlflow.log_metric(f"f1_{target}", f1_val)
+
         mlflow.sklearn.log_model(
             sk_model=model,
             artifact_path="model",
@@ -100,7 +125,12 @@ def train_and_log(**context) -> str:
         )
         run_id = run.info.run_id
 
-    logger.info("Run id: %s | F1: %.4f | Anomaly ratio: %.4f", run_id, f1, anomaly_ratio)
+    logger.info(
+        "Run %s | F1 macro: %.4f | Per-target: %s",
+        run_id,
+        f1_macro,
+        {k: f"{v:.4f}" for k, v in per_target_f1.items()},
+    )
     return run_id
 
 
@@ -117,7 +147,7 @@ def promote_or_reject(**context) -> None:
         raise ValueError("No run_id received from train_model task.")
 
     run = client.get_run(run_id)
-    new_f1 = float(run.data.metrics.get("f1_score", 0.0))
+    new_f1 = float(run.data.metrics.get("f1_macro", 0.0))
 
     versions = client.get_latest_versions(MODEL_NAME, stages=["None", "Staging"])
     if not versions:
@@ -125,7 +155,7 @@ def promote_or_reject(**context) -> None:
     new_version = sorted(versions, key=lambda v: int(v.version))[-1]
 
     prod_f1 = _get_production_f1()
-    logger.info("New model F1: %.4f | Production F1: %s", new_f1, prod_f1)
+    logger.info("New model F1 macro: %.4f | Production F1 macro: %s", new_f1, prod_f1)
 
     if prod_f1 is None or new_f1 > prod_f1:
         client.transition_model_version_stage(
