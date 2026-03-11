@@ -127,10 +127,12 @@ services:
       MLFLOW_TRACKING_URI: http://mlflow:5000
       ENV: dev
       PYTHONUNBUFFERED: "1"
+      METRICS_PATH: /app/reports/model_metrics.json
     volumes:
       - ./api:/app/api
       - ./src:/app/src
       - ./models:/app/models
+      - ./reports:/app/reports
     ports:
       - "8000:8000"
     depends_on:
