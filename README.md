@@ -71,18 +71,44 @@
 
 ## 🏗️ Architecture
 
-```
-[UCI Dataset]
-    │  DAG: data_pipeline (@daily)
-[Download → Unzip → Merge → Preprocess → Sample 80% → Trigger training]
-    │  DAG: training_pipeline (event-driven)
-[Train via src/train.py → Register in MLflow → Promote/Reject (F1 comparison)]
-    │
-[FastAPI] ← model served from models/model.pkl
-    │
-[Streamlit WebApp] → FastAPI → predictions → UI
-    │
-[Prometheus + Grafana] → API metrics (/metrics) + system metrics (node-exporter)
+```mermaid
+flowchart TD
+    UCI[(UCI Dataset\n2205 cycles × 17 capteurs)]
+
+    subgraph Airflow ["⚙️ Airflow — Orchestration"]
+        DAG1["data_pipeline\n@daily"]
+        DAG2["training_pipeline\nevent-driven"]
+        DAG1 -->|TriggerDagRun| DAG2
+    end
+
+    subgraph Training ["🧠 Entraînement"]
+        TRAIN["src/train.py\nMultiOutputClassifier\nRandomForest × 4 cibles"]
+    end
+
+    subgraph MLflow ["📊 MLflow :5000"]
+        REGISTRY["Model Registry\nPromotion / Archivage\n(comparaison F1)"]
+        ARTIFACTS["Artefacts S3\nMinIO :9000"]
+        REGISTRY --> ARTIFACTS
+    end
+
+    subgraph API ["🔌 FastAPI :8000"]
+        PREDICT["/predict\n/health\n/metrics"]
+    end
+
+    subgraph Monitoring ["📈 Monitoring"]
+        PROM["Prometheus :9090"]
+        GRAF["Grafana :3000"]
+        NODE["Node Exporter :9100"]
+        PROM --> GRAF
+        NODE --> PROM
+    end
+
+    UCI --> DAG1
+    DAG1 --> TRAIN
+    TRAIN --> REGISTRY
+    REGISTRY -->|modèle Production| API
+    API --> PROM
+    API --> WEBAPP["🖥️ Streamlit :8501\nPrédiction + Évaluation"]
 ```
 
 ## 🐳 Services (Docker Compose)
