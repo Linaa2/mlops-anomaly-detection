@@ -5,6 +5,8 @@ models/*.pkl
 data/
 mlruns/
 notebooks/
+context/
+.claude/
 # Env files
 envs/.env.dev
 envs/.env.prod

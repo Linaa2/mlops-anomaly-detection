@@ -17,6 +17,12 @@ SENSORS = [
     "PS1",
     "PS2",
     "PS3",
+    "PS4",
+    "PS5",
+    "PS6",
+    "EPS1",
+    "FS1",
+    "FS2",
     "TS1",
     "TS2",
     "TS3",
@@ -24,6 +30,15 @@ SENSORS = [
     "VS1",
     "CE",
     "CP",
+    "SE",
+]
+
+PROFILE_COLS = [
+    "cooler_condition",
+    "valve_condition",
+    "pump_leakage",
+    "accumulator_pressure",
+    "stable_flag",
 ]
 
 
@@ -65,6 +80,11 @@ def find_sensor_file(sensor: str) -> Path:
     return matches[0]
 
 
+def load_profile() -> pd.DataFrame:
+    profile_path = next(EXTRACT_DIR.rglob("profile.txt"))
+    return pd.read_csv(profile_path, sep=r"\s+", header=None, names=PROFILE_COLS, engine="python")
+
+
 def merge_sensors() -> None:
     print("Merging sensor files...")
 
@@ -72,25 +92,21 @@ def merge_sensors() -> None:
 
     for sensor in SENSORS:
         file_path = find_sensor_file(sensor)
-
         df = pd.read_csv(file_path, sep=r"\s+", header=None, engine="python")
-
-        # Each row = one cycle, each column = one time sample
-        # We summarize each cycle by its mean value for this sensor
         series = df.mean(axis=1)
         series.name = sensor
-
         sensor_series.append(series)
-
         print(f"{sensor}: raw shape={df.shape} -> merged shape={series.shape}")
 
-    df_final = pd.concat(sensor_series, axis=1)
+    df_sensors = pd.concat(sensor_series, axis=1)
+    df_profile = load_profile()
+
+    df_final = pd.concat([df_sensors, df_profile], axis=1)
 
     OUTPUT_CSV.parent.mkdir(parents=True, exist_ok=True)
     df_final.to_csv(OUTPUT_CSV, index=False)
 
     print(f"CSV created: {OUTPUT_CSV}")
-    print(df_final.head())
     print(df_final.shape)
 
 
