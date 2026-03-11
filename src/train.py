@@ -149,7 +149,7 @@ def train() -> None:
             }
 
         joblib.dump(model, MODEL_PATH)
-        mlflow.log_artifact(MODEL_PATH, artifact_path="model")
+        mlflow.sklearn.log_model(model, "model")
 
         with open(METRICS_PATH, "w", encoding="utf-8") as f:
             json.dump(metrics, f, indent=2)

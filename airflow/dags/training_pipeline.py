@@ -148,7 +148,7 @@ def promote_or_reject(**context) -> None:
         client.transition_model_version_stage(
             name=MODEL_NAME,
             version=new_version.version,
-            to_stage="Production",
+            stage="Production",
             archive_existing_versions=True,
         )
         logger.info("Model v%s promoted to Production.", new_version.version)
@@ -156,7 +156,7 @@ def promote_or_reject(**context) -> None:
         client.transition_model_version_stage(
             name=MODEL_NAME,
             version=new_version.version,
-            to_stage="Archived",
+            stage="Archived",
         )
         logger.info("Model v%s archived (F1 did not improve).", new_version.version)
 

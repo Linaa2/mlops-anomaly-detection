@@ -8,7 +8,9 @@
 # ============================================================
 
 x-airflow-common: &airflow-common
-  image: apache/airflow:2.9.1
+  build:
+    context: .
+    dockerfile: airflow/Dockerfile
   env_file:
     - path: envs/.env.dev
       required: false
@@ -58,14 +60,16 @@ services:
   #   des credentials MinIO directement (seul ce service y accède).
   mlflow:
     image: ghcr.io/mlflow/mlflow:v3.1.0
-    entrypoint: >
-      bash -c "pip install boto3 -q &&
-               mlflow server
-               --backend-store-uri sqlite:////mlflow/mlflow.db
-               --artifacts-destination s3://${MINIO_BUCKET:-mlops}/mlflow
-               --serve-artifacts
-               --host 0.0.0.0
-               --port 5000"
+    entrypoint: ["/bin/bash", "-c"]
+    command:
+      - |
+        pip install boto3 -q &&
+        mlflow server \
+          --backend-store-uri sqlite:////mlflow/mlflow.db \
+          --artifacts-destination s3://${MINIO_BUCKET:-mlops}/mlflow \
+          --serve-artifacts \
+          --host 0.0.0.0 \
+          --port 5000
     environment:
       MLFLOW_S3_ENDPOINT_URL: ${MINIO_ENDPOINT_URL:-http://89.58.44.97:9000}
       AWS_ACCESS_KEY_ID: ${MINIO_ACCESS_KEY}
