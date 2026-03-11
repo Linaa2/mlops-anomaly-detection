@@ -25,7 +25,7 @@ logger = logging.getLogger(__name__)
 ALERT_EMAIL = os.getenv("ALERT_EMAIL", "team@example.com")
 MLFLOW_TRACKING_URI = os.getenv("MLFLOW_TRACKING_URI", "http://mlflow:5000")
 MODEL_NAME = "hydraulic-anomaly-detector"
-FEATURES_PATH = os.getenv("FEATURES_PATH", "data/processed/hydraulic_clean.csv")
+FEATURES_PATH = os.getenv("FEATURES_PATH", "data/processed/hydraulic_sample.csv")
 
 FEATURES = ["PS1", "PS2", "PS3", "TS1", "TS2", "TS3", "TS4", "VS1", "CE", "CP"]
 
@@ -142,8 +142,8 @@ def promote_or_reject(**context) -> None:
 with DAG(
     dag_id="training_pipeline",
     default_args=default_args,
-    description="Weekly retraining: train \u2192 evaluate \u2192 compare \u2192 promote/reject",
-    schedule="@weekly",
+    description="Retraining triggered by data_pipeline: train, evaluate, promote/reject",
+    schedule=None,
     start_date=datetime(2024, 1, 1),
     catchup=False,
     tags=["training", "mlflow"],
