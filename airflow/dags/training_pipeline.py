@@ -38,8 +38,9 @@ default_args = {
 
 
 def _get_production_f1() -> float | None:
-    """Return the F1 metric of the current Production model, or None."""
+    """Return the F1 metric of the current Production model, or None if no model exists."""
     import mlflow
+    from mlflow.exceptions import MlflowException
     from mlflow.tracking import MlflowClient
 
     mlflow.set_tracking_uri(MLFLOW_TRACKING_URI)
@@ -51,8 +52,12 @@ def _get_production_f1() -> float | None:
         run_id = versions[0].run_id
         run = client.get_run(run_id)
         return float(run.data.metrics.get("f1_score", 0.0))
-    except Exception:
-        return None
+    except MlflowException as exc:
+        if "RESOURCE_DOES_NOT_EXIST" in str(exc):
+            # Model not registered yet — treat as no Production model
+            return None
+        logger.exception("MLflow error while fetching Production F1 for %s", MODEL_NAME)
+        raise
 
 
 def train_and_log(**context) -> str:

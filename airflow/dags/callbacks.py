@@ -28,7 +28,7 @@ def build_failure_callback(email: str) -> Callable:
             from airflow.utils.email import send_email
 
             send_email(to=email, subject=subject, html_content=body)
-        except Exception as exc:
-            logger.error("Failed to send alert email to %s: %s", email, exc)
+        except Exception:
+            logger.exception("Failed to send alert email to %s", email)
 
     return on_failure
