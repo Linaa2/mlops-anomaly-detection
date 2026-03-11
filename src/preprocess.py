@@ -36,7 +36,7 @@ def preprocess() -> None:
 
     df = df[SENSORS + TARGETS].dropna()
 
-    Path("data/processed").mkdir(parents=True, exist_ok=True)
+    Path(OUTPUT_PATH).parent.mkdir(parents=True, exist_ok=True)
     df.to_csv(OUTPUT_PATH, index=False)
 
     print(f"Rows: {len(df)} | Features: {len(SENSORS)} | Targets: {TARGETS}")

@@ -1,167 +1,152 @@
-# Détection d’anomalies dans un système hydraulique
+# Hydraulic System Condition Monitoring — MLOps Pipeline
 
-## Objectif
+Multi-output classification of hydraulic system component health using sensor data, with full MLOps infrastructure: Airflow orchestration, MLflow tracking, FastAPI serving, Streamlit UI, and Prometheus/Grafana monitoring.
 
-Ce projet vise à détecter des comportements anormaux dans un système hydraulique à partir de données issues de capteurs industriels.  
-Nous mettons en place un pipeline de machine learning permettant de :
+## Dataset
 
-- récupérer et préparer les données,
-- entraîner un modèle de détection d’anomalies,
-- exposer le modèle via une API,
-- préparer une intégration MLOps avec suivi, tests et conteneurisation.
+**[UCI Condition Monitoring of Hydraulic Systems](https://archive.ics.uci.edu/ml/datasets/Condition+monitoring+of+hydraulic+systems)**
 
-## Jeu de données
+- 2205 cycles × 17 sensors (pressure, temperature, vibration, flow, efficiency)
+- Labels from `profile.txt`: condition of 4 components per cycle
+- Unstable cycles filtered out (`stable_flag == 0`)
 
-Le projet utilise le dataset **Condition Monitoring of Hydraulic Systems** de l’UCI Machine Learning Repository.
+| Target | Component | Classes |
+|--------|-----------|---------|
+| `cooler_condition` | Cooler | 3 (failure), 20 (reduced), 100 (ok) |
+| `valve_condition` | Valve | 73 (failure), 80 (severe lag), 90 (slight lag), 100 (ok) |
+| `pump_leakage` | Pump | 0 (none), 1 (weak), 2 (severe) |
+| `accumulator_pressure` | Accumulator | 90 (failure), 100 (severe), 115 (reduced), 130 (ok) |
 
-Les données proviennent de plusieurs capteurs industriels, notamment :
+## Model
 
-- capteurs de pression (`PS1`, `PS2`, `PS3`)
-- capteurs de température (`TS1`, `TS2`, `TS3`, `TS4`)
-- capteur de vibration (`VS1`)
-- variables d’efficacité et de puissance (`CE`, `CP`)
+`MultiOutputClassifier(RandomForestClassifier(n_estimators=100))`
 
-Chaque fichier capteur est traité puis fusionné dans un CSV unique.
+- **17 features**: PS1–PS6, EPS1, FS1–FS2, TS1–TS4, VS1, CE, CP, SE (mean per cycle)
+- **4 targets**: multi-class classification per component
+- **Metrics**: F1 macro per target + overall F1 macro average
+- **Tracking**: MLflow (params, metrics, model artifact)
 
-## Pipeline du projet
+## Architecture
 
-Le pipeline suit les étapes suivantes :
+```
+[UCI Dataset]
+    ↓  DAG: data_pipeline (@daily)
+[Download → Unzip → Merge → Preprocess → Sample 80% → Trigger training]
+    ↓  DAG: training_pipeline (event-driven)
+[Train via src/train.py → Register in MLflow → Promote/Reject (F1 comparison)]
+    ↓
+[FastAPI] ← model from MLflow Registry
+    ↓
+[Streamlit WebApp] → FastAPI → predictions → UI
+    ↓
+[Prometheus + Grafana] → API metrics + model performance
+```
 
-1. **Ingestion des données**
-   - téléchargement du dataset
-   - décompression
-   - lecture des fichiers capteurs
-   - fusion en un CSV unique
+## Services
 
-2. **Prétraitement**
-   - sélection des variables utiles
-   - suppression des valeurs manquantes
-   - sauvegarde des données nettoyées
-
-3. **Entraînement**
-   - standardisation des données avec `StandardScaler`
-   - entraînement d’un modèle `IsolationForest`
-   - calcul des prédictions et scores d’anomalie
-   - sauvegarde du modèle et des résultats
-
-4. **Exposition via API**
-   - déploiement d’un service FastAPI
-   - prédiction sur de nouvelles mesures capteurs
-
-## Modèle utilisé
-
-Le modèle choisi est **Isolation Forest**.
-
-Ce choix est motivé par le fait qu’il s’agit d’un algorithme bien adapté à la détection d’anomalies dans des données tabulaires multivariées, notamment dans un contexte de surveillance industrielle.
-
-## Stack technique
-
-- Python
-- pandas
-- scikit-learn
-- FastAPI
-- uv
-- GitHub Actions
-- Ruff
-- Pytest
-- MLflow
-- Docker
-
-## Structure du projet
-
-```text
-mlops-anomaly-detection/
-│
-├── api/
-│   └── app.py
-├── data/
-│   ├── raw/
-│   └── processed/
-├── models/
-├── notebooks/
-├── src/
-│   ├── data_ingestion.py
-│   ├── preprocess.py
-│   └── train.py
-├── tests/
-├── webapp/
-├── .github/workflows/
-├── pyproject.toml
-├── Dockerfile.api
-├── Dockerfile.webapp
-├── docker-compose.yml
-└── README.md
-## Infrastructure & MLOps
-
-Cette section couvre le déploiement, l'orchestration et le monitoring du projet.
-
-### Environnements
-
-| Env | Outil | Commande |
-|-----|-------|----------|
-| `dev` | Docker Compose | `docker compose --env-file envs/.env.dev up` |
-| `prod` | Kubernetes | `kubectl apply -f k8s/` |
-
-### Services (dev)
-
-| Service | Port | Rôle |
+| Service | Port | Role |
 |---------|------|------|
-| Airflow | 8080 | Orchestration des pipelines |
-| MLflow | 5000 | Tracking des expériences |
-| FastAPI | 8000 | API de prédiction |
-| Streamlit | 8501 | Interface utilisateur |
-| Prometheus | 9090 | Collecte des métriques |
-| Grafana | 3000 | Dashboards monitoring |
+| Airflow | 8080 | Pipeline orchestration (admin/admin) |
+| MLflow | 5000 | Experiment tracking & model registry |
+| FastAPI | 8000 | Prediction API |
+| Streamlit | 8501 | User interface |
+| Prometheus | 9090 | Metrics collection |
+| Grafana | 3000 | Dashboards (admin/admin) |
+| PostgreSQL | 5432 | Airflow metadata backend |
 
+## Quick Start
 
-
-### CI/CD
-
-Le pipeline GitHub Actions (`.github/workflows/cd.yml`) :
-1. Lance les tests (`pytest`)
-2. Build les images Docker et les push sur DockerHub
-3. Déploie automatiquement sur Kubernetes au push sur `main`
-
-### Monitoring
-
-- **Prometheus** — scrape les métriques FastAPI via `/metrics`
-- **Grafana** — dashboard auto-provisionné : requests/sec, latence p95, anomaly scores, DAG success rate
-
-### Lancer le projet
-
-**Dev (Docker Compose) :**
 ```bash
-# 1. Cloner et installer
-git clone <repo>
-uv sync
+# Clone and install
+git clone git@github.com:Linaa2/mlops-anomaly-detection.git
+cd mlops-anomaly-detection
+pip install uv && uv sync
 
-# 2. Lancer tous les services
-docker compose --env-file envs/.env.dev up --build
+# Run tests
+uv run pytest tests/ -v
 
-# 3. Arrêter
+# Launch dev environment (all services)
+docker compose up --build
+
+# Stop
 docker compose down
 ```
 
-**Prod (Kubernetes) :**
-```bash
-# 1. Créer le namespace
-kubectl create namespace mlops
+## Project Structure
 
-# 2. Appliquer les secrets
-kubectl create secret generic mlops-secrets \
-  --from-literal=MLFLOW_TRACKING_URI=http://mlflow:5000 \
-  --namespace mlops
-
-# 3. Déployer
-kubectl apply -f k8s/
-
-# 4. Vérifier
-kubectl get pods -n mlops
-kubectl get services -n mlops
+```
+mlops-anomaly-detection/
+├── .github/workflows/
+│   ├── ci.yaml                    # CI: pytest + ruff on push/PR
+│   └── cd.yml                     # CD: test → build DockerHub → deploy K8s
+├── airflow/dags/
+│   ├── callbacks.py               # Email failure alerting
+│   ├── data_pipeline.py           # DAG: ingestion + preprocessing + sampling
+│   └── training_pipeline.py       # DAG: train + MLflow register + promote/reject
+├── api/
+│   ├── Dockerfile
+│   └── app.py                     # FastAPI prediction service
+├── webapp/
+│   ├── Dockerfile
+│   └── app.py                     # Streamlit UI
+├── src/
+│   ├── data_ingestion.py          # Download UCI + unzip + merge sensors
+│   ├── preprocess.py              # Filter, clean, select features+targets
+│   └── train.py                   # MultiOutput RF training + MLflow tracking
+├── k8s/
+│   ├── api-deployment.yaml        # K8s deployment + service
+│   └── webapp-deployment.yaml     # K8s deployment + service
+├── monitoring/
+│   ├── prometheus.yml             # Prometheus scrape config
+│   └── grafana/                   # Grafana provisioning + dashboards
+├── tests/
+│   ├── test_dags.py               # Airflow DAG structure tests (9 tests)
+│   └── test_model.py              # Model training + prediction tests (7 tests)
+├── envs/.env.example              # Environment variable template
+├── docker-compose.yml             # Dev environment (all services)
+├── pyproject.toml                 # Dependencies (uv)
+└── ORGANISATION.md                # Project plan & task tracking
 ```
 
-**Monitoring :**
-```bash
-# Grafana  → http://localhost:3000  (admin / admin)
-# Prometheus → http://localhost:9090
+## CI/CD
+
+**CI** (`.github/workflows/ci.yaml`): runs on every push/PR
+- `uv run pytest` — unit + DAG tests
+- `uv run ruff check .` — linting
+
+**CD** (`.github/workflows/cd.yml`): runs on push to `main`
+1. Run tests
+2. Build & push Docker images to DockerHub (API + Webapp)
+3. Deploy to Kubernetes (conditional: skipped if `KUBECONFIG` secret not set)
+
+## Airflow Pipelines
+
+### `data_pipeline` — `@daily`
 ```
+download_dataset → unzip_dataset → merge_sensors → preprocess → sample_data (80%) → trigger_training
+```
+Random 80% sampling on each run simulates new data arrival on a static dataset, giving purpose to the champion/challenger model comparison.
+
+### `training_pipeline` — event-driven (triggered by data_pipeline)
+```
+train_model → promote_or_reject
+```
+- Delegates training to `src/train.py` (single source of truth)
+- Registers model in MLflow Model Registry
+- Compares new model F1 macro vs current Production model
+- Promotes if better, archives otherwise
+
+## Team
+
+| Person | Scope |
+|--------|-------|
+| A | Data & ML pipeline (`src/`) |
+| B | Airflow DAGs, continuous training, CI/CD, alerting |
+| C | FastAPI API, Streamlit webapp |
+| D | Docker, K8s, monitoring infra |
+
+See `ORGANISATION.md` for detailed task tracking.
+
+## Stack
+
+Python 3.11 · scikit-learn · MLflow · Apache Airflow · FastAPI · Streamlit · Docker · Kubernetes · Prometheus · Grafana · GitHub Actions · uv
