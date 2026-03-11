@@ -7,6 +7,9 @@
 
 ## Slide Plan (6 min budget)
 
+> **Structure the presentation around evaluation criteria**, not around chronological work.
+> The grading criteria are: code quality, good AI usage, Airflow+CI/CD automation, MLflow usage, API+WebApp functionality, architecture coherence, GitHub collaboration.
+
 ### Slide 1 — Title + Context (30s)
 
 **Content:**
@@ -117,9 +120,10 @@ CD: test -> build API + Webapp images -> push DockerHub -> deploy K8s
 
 **Key points:**
 - **CI triggers on every PR + push to main** — catches regressions before merge
-- **CD triggers on push to main only** — test first, then build & push to DockerHub
-- **K8s deploy is conditional** — `if: secrets.KUBECONFIG != ''` — graceful skip for environments without cluster
+- **CD triggers on push to main only** — test first, then build & push to GHCR + DockerHub
+- **K8s deploy is conditional** — check-deploy job verifies `KUBECONFIG` secret exists, deploy job skips gracefully if not
 - **Image tagging**: `latest` + `git short SHA` — enables rollback
+- **Dual registry**: GHCR (GitHub Packages) + DockerHub
 - **Package manager**: `uv` (faster than pip, lockfile for reproducibility)
 
 **Test coverage (26 tests):**
@@ -146,7 +150,7 @@ CD: test -> build API + Webapp images -> push DockerHub -> deploy K8s
 - **Tab 2 "Model evaluation"**: displays accuracy, precision, recall, F1, confusion matrices per target from `reports/model_metrics.json`
 
 **Monitoring (Prometheus + Grafana):**
-- Prometheus scrapes node-exporter (system metrics)
+- Prometheus scrapes API `/metrics` (via prometheus-fastapi-instrumentator) + node-exporter (system metrics)
 - Grafana dashboard provisioned automatically (JSON + provisioning config)
 - Dashboard auto-provisioned on `docker-compose up`
 
@@ -177,7 +181,8 @@ CD: test -> build API + Webapp images -> push DockerHub -> deploy K8s
 **Git workflow:**
 - Feature branches (`feature/`, `fix/`, `refactor/`)
 - PRs to `main` with CI checks (ruff + pytest must pass)
-- 16 PRs merged, atomic commits, conventional commit messages
+- 20+ PRs merged, atomic commits, conventional commit messages
+- Copilot code reviews on PRs
 
 **Honest lessons / limitations:**
 - Dataset is static — CT pipeline is designed for production but trained on sampled data
@@ -279,3 +284,51 @@ F1 macro per target: cooler=1.000, valve=0.947, pump=0.993, accumulator=0.990. T
 - **Be honest about limitations** — evaluators appreciate awareness over pretending everything is perfect
 - **Code snippets only if asked** — no code on slides, explain concepts
 - **WebApp Tab 2 is a strong visual** — shows confusion matrices and classification reports, good for a screenshot
+
+---
+
+## Objectives Coverage (from course spec)
+
+### Required Objectives (10/10 completed)
+
+| # | Objective (from spec) | What we built | Where |
+|---|----------------------|---------------|-------|
+| 1 | Extract & preprocess data | UCI download, unzip, merge 17 sensors, filter unstable, dropna | `src/data_ingestion.py`, `src/preprocess.py`, DAG |
+| 2 | Build ML model | MultiOutputClassifier(RF), 4 targets, F1 > 0.94 | `src/train.py` |
+| 3 | Model registry | MLflow Model Registry with promote/reject stages | DAG `training_pipeline.py` |
+| 4 | Airflow retraining pipeline | 2 DAGs: data_pipeline (@daily) + training_pipeline (event-driven) | `airflow/dags/` |
+| 5 | MLflow tracking | Params, metrics (F1/accuracy/precision/recall), artifacts, JSON report | `src/train.py` |
+| 6 | API | FastAPI, Pydantic body, `/predict`, `/health`, `/metrics`, Swagger | `api/app.py` |
+| 7 | WebApp | Streamlit, 2 tabs (prediction + model evaluation with confusion matrices) | `webapp/app.py` |
+| 8 | Continuous Training (CT) | Random 80% sampling + champion/challenger F1 comparison + auto-promote | DAGs + `src/train.py` |
+| 9 | Docker + K8s + CI/CD | Docker Compose (9 services), K8s manifests, CI (pytest+ruff), CD (build GHCR+DH, deploy K8s) | `docker-compose.yml`, `k8s/`, `.github/workflows/` |
+| 10 | GitHub versioning & docs | 20+ PRs, conventional commits, README, model card, ORGANISATION.md | repo root + `docs/` |
+
+### Bonus Objectives (3 completed)
+
+| # | Bonus (from spec) | What we built | Where |
+|---|-------------------|---------------|-------|
+| 12 | Monitoring | Prometheus + Grafana + Node Exporter, API `/metrics` via instrumentator, dashboard auto-provisioned | `monitoring/`, `api/app.py` |
+| 14 | Model versioning / rollback | MLflow Registry stages (None -> Staging -> Production -> Archived), DAG manages transitions | DAG `promote_or_reject` |
+| 17 | Email alerting | `on_failure_callback` on all DAGs, SMTP alerting | `airflow/dags/callbacks.py` |
+
+### Bonus NOT done (and why)
+
+| # | Bonus | Why not |
+|---|-------|---------|
+| 11 | Live data (streaming/API) | Dataset is static (UCI). Sampling simulates variability. |
+| 13 | Load testing (Locust) | Time constraint. Would be straightforward to add. |
+| 15 | Human in the loop | Not applicable to this use case (industrial sensors, no human labeling). |
+| 16 | API access management | Time constraint. Would add API keys or OAuth. |
+
+### Evaluation Criteria Mapping
+
+| Criterion | Our evidence |
+|-----------|-------------|
+| **Code quality** | 26 tests (3 suites), ruff linting, type hints, modular src/, SOLID principles |
+| **Good AI usage** | Concise README, no superfluous code, Copilot used for reviews not blind generation |
+| **Airflow + CI/CD** | 2 DAGs with CT logic, CI on every PR, CD with dual registry + conditional K8s deploy |
+| **MLflow tracking** | Full experiment tracking, Model Registry, promote/reject, metrics export |
+| **API + WebApp** | FastAPI Swagger + Pydantic + 3 endpoints, Streamlit 2 tabs with confusion matrices |
+| **Architecture coherence** | Clear separation: src/ (business), airflow/ (orchestration), api/ (serving), webapp/ (UI) |
+| **GitHub collaboration** | 20+ PRs, 4 contributors, feature branches, CI gates, conventional commits |
