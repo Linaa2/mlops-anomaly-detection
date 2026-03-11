@@ -1,54 +1,85 @@
 # ============================================================
 # DEV ENVIRONMENT — Docker Compose
 # Services : Airflow, MLflow, FastAPI, Streamlit, Monitoring
+#
+# Variables d'environnement : copier envs/.env.example → envs/.env.dev
+# Le fichier est chargé automatiquement (required: false).
+# Pour la substitution YAML : docker compose --env-file envs/.env.dev up
 # ============================================================
 
 x-airflow-common: &airflow-common
-  image: apache/airflow:2.9.1
-  environment: &airflow-common-env
+  build:
+    context: .
+    dockerfile: airflow/Dockerfile
+  env_file:
+    - path: envs/.env.dev
+      required: false
+  environment:
     AIRFLOW__CORE__EXECUTOR: LocalExecutor
-    AIRFLOW__DATABASE__SQL_ALCHEMY_CONN: postgresql+psycopg2://airflow:airflow@postgres/airflow
-    AIRFLOW__CORE__FERNET_KEY: ""
+    AIRFLOW__DATABASE__SQL_ALCHEMY_CONN: >-
+      postgresql+psycopg2://${POSTGRES_USER:-airflow}:${POSTGRES_PASSWORD:-airflow}@postgres/${POSTGRES_DB:-airflow}
+    # AIRFLOW_FERNET_KEY: generate with `python -c "from cryptography.fernet import Fernet; print(Fernet.generate_key().decode())"`
+    AIRFLOW__CORE__FERNET_KEY: ${AIRFLOW_FERNET_KEY:-}
     AIRFLOW__CORE__DAGS_ARE_PAUSED_AT_CREATION: "true"
     AIRFLOW__CORE__LOAD_EXAMPLES: "false"
-    AIRFLOW__API__AUTH_BACKENDS: "airflow.api.auth.backend.basic_auth"
+    AIRFLOW__API__AUTH_BACKENDS: "airflow.api.auth.backend.session,airflow.api.auth.backend.basic_auth"
+    PYTHONPATH: /opt/airflow
     MLFLOW_TRACKING_URI: http://mlflow:5000
   volumes:
     - ./airflow/dags:/opt/airflow/dags
-    - ./logs:/opt/airflow/logs
+    - airflow_logs:/opt/airflow/logs
     - ./src:/opt/airflow/src
+    - ./models:/opt/airflow/models
+    - ./reports:/opt/airflow/reports
+    - ./data:/opt/airflow/data
   depends_on:
     postgres:
       condition: service_healthy
 
 services:
 
-  # ── PostgreSQL (Airflow backend + MLflow backend) ──────────
+  # ── PostgreSQL (Airflow backend) ───────────────────────────
   postgres:
     image: postgres:15
+    env_file:
+      - path: envs/.env.dev
+        required: false
     environment:
-      POSTGRES_USER: airflow
-      POSTGRES_PASSWORD: airflow
-      POSTGRES_DB: airflow
+      POSTGRES_USER: ${POSTGRES_USER:-airflow}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-airflow}
+      POSTGRES_DB: ${POSTGRES_DB:-airflow}
     volumes:
       - postgres_data:/var/lib/postgresql/data
     healthcheck:
-      test: ["CMD", "pg_isready", "-U", "airflow"]
+      test: ["CMD", "pg_isready", "-U", "${POSTGRES_USER:-airflow}"]
       interval: 10s
       retries: 5
     ports:
       - "5432:5432"
 
   # ── MLflow Tracking Server ─────────────────────────────────
+  # Artefacts stockés sur MinIO (S3-compatible) : modèles, métriques JSON
+  # --serve-artifacts : MLflow proxie les artefacts → les clients n'ont pas besoin
+  #   des credentials MinIO directement (seul ce service y accède).
   mlflow:
     image: ghcr.io/mlflow/mlflow:v3.1.0
-    command: >
-      mlflow server
-      --backend-store-uri sqlite:////mlflow/mlflow.db
-      --artifacts-destination /mlflow/artifacts
-      --serve-artifacts
-      --host 0.0.0.0
-      --port 5000
+    entrypoint: ["/bin/bash", "-c"]
+    command:
+      - |
+        pip install boto3 -q &&
+        mlflow server \
+          --backend-store-uri sqlite:////mlflow/mlflow.db \
+          --artifacts-destination s3://${MINIO_BUCKET:-mlops}/mlflow \
+          --serve-artifacts \
+          --host 0.0.0.0 \
+          --port 5000
+    environment:
+      MLFLOW_S3_ENDPOINT_URL: ${MINIO_ENDPOINT_URL:-http://89.58.44.97:9000}
+      AWS_ACCESS_KEY_ID: ${MINIO_ACCESS_KEY}
+      AWS_SECRET_ACCESS_KEY: ${MINIO_SECRET_KEY}
+    env_file:
+      - path: envs/.env.dev
+        required: false
     volumes:
       - mlflow_data:/mlflow
     ports:
@@ -57,12 +88,12 @@ services:
   # ── Airflow Init ───────────────────────────────────────────
   airflow-init:
     <<: *airflow-common
-    command: >
-      bash -c "airflow db migrate &&
-               airflow users create
-               --username admin --password admin
-               --firstname Admin --lastname Admin
-               --role Admin --email admin@example.com"
+    entrypoint: /bin/bash
+    command:
+      - -c
+      - |
+        airflow db migrate &&
+        airflow users create --username ${AIRFLOW_ADMIN_USER:-admin} --password ${AIRFLOW_ADMIN_PASSWORD:-admin} --firstname Admin --lastname Admin --role Admin --email admin@example.com
     restart: on-failure
 
   # ── Airflow Webserver ──────────────────────────────────────
@@ -89,12 +120,17 @@ services:
     build:
       context: .
       dockerfile: api/Dockerfile
+    env_file:
+      - path: envs/.env.dev
+        required: false
     environment:
       MLFLOW_TRACKING_URI: http://mlflow:5000
       ENV: dev
+      PYTHONUNBUFFERED: "1"
     volumes:
       - ./api:/app/api
       - ./src:/app/src
+      - ./models:/app/models
     ports:
       - "8000:8000"
     depends_on:
@@ -106,11 +142,15 @@ services:
     build:
       context: .
       dockerfile: webapp/Dockerfile
+    env_file:
+      - path: envs/.env.dev
+        required: false
     environment:
       API_URL: http://api:8000
       ENV: dev
     volumes:
       - ./webapp:/app/webapp
+      - ./reports:/app/reports
     ports:
       - "8501:8501"
     depends_on:
@@ -120,6 +160,9 @@ services:
   # ── Prometheus ─────────────────────────────────────────────
   prometheus:
     image: prom/prometheus:v2.51.0
+    env_file:
+      - path: envs/.env.dev
+        required: false
     volumes:
       - ./monitoring/prometheus.yml:/etc/prometheus/prometheus.yml
     ports:
@@ -129,8 +172,11 @@ services:
   # ── Grafana ────────────────────────────────────────────────
   grafana:
     image: grafana/grafana:10.4.2
+    env_file:
+      - path: envs/.env.dev
+        required: false
     environment:
-      GF_SECURITY_ADMIN_PASSWORD: admin
+      GF_SECURITY_ADMIN_PASSWORD: ${GRAFANA_ADMIN_PASSWORD:-admin}
     volumes:
       - grafana_data:/var/lib/grafana
       - ./monitoring/grafana/provisioning:/etc/grafana/provisioning
@@ -152,3 +198,4 @@ volumes:
   postgres_data:
   mlflow_data:
   grafana_data:
+  airflow_logs:

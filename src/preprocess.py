@@ -1,9 +1,10 @@
+import os
 from pathlib import Path
 
 import pandas as pd
 
-INPUT_PATH = "data/raw/hydraulic_data.csv"
-OUTPUT_PATH = "data/processed/hydraulic_clean.csv"
+INPUT_PATH = os.getenv("RAW_CSV_PATH", "data/raw/hydraulic_data.csv")
+OUTPUT_PATH = os.getenv("PROCESSED_CSV_PATH", "data/processed/hydraulic_clean.csv")
 
 SENSORS = [
     "PS1",

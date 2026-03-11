@@ -24,7 +24,7 @@ spec:
     spec:
       containers:
         - name: api
-          image: $DOCKERHUB_USERNAME/mlops-api:latest
+          image: IMAGE_API
           ports:
             - containerPort: 8000
           env:
@@ -35,6 +35,28 @@ spec:
                 secretKeyRef:
                   name: mlops-secrets
                   key: MLFLOW_TRACKING_URI
+            - name: MLFLOW_MODEL_NAME
+              valueFrom:
+                secretKeyRef:
+                  name: mlops-secrets
+                  key: MLFLOW_MODEL_NAME
+            # MinIO credentials — nécessaires si MLflow ne proxie pas les artefacts
+            # (en prod avec MLflow externe, l'API télécharge directement depuis MinIO)
+            - name: MLFLOW_S3_ENDPOINT_URL
+              valueFrom:
+                secretKeyRef:
+                  name: mlops-secrets
+                  key: MINIO_ENDPOINT_URL
+            - name: AWS_ACCESS_KEY_ID
+              valueFrom:
+                secretKeyRef:
+                  name: mlops-secrets
+                  key: MINIO_ACCESS_KEY
+            - name: AWS_SECRET_ACCESS_KEY
+              valueFrom:
+                secretKeyRef:
+                  name: mlops-secrets
+                  key: MINIO_SECRET_KEY
           resources:
             requests:
               memory: "256Mi"

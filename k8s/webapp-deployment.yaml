@@ -20,7 +20,7 @@ spec:
     spec:
       containers:
         - name: webapp
-          image: $DOCKERHUB_USERNAME/mlops-webapp:latest
+          image: IMAGE_WEBAPP
           ports:
             - containerPort: 8501
           env:

@@ -1,8 +1,9 @@
 """Tests for the FastAPI prediction API."""
 
+import importlib.util
 import os
 import sys
-from unittest.mock import MagicMock, patch
+from unittest.mock import MagicMock
 
 import numpy as np
 from fastapi.testclient import TestClient
@@ -13,14 +14,16 @@ sys.path.insert(0, PROJECT_ROOT)
 mock_model = MagicMock()
 mock_model.predict.return_value = np.array([[3, 100, 0, 130]])
 
-with patch("joblib.load", return_value=mock_model):
-    import importlib.util
-    spec = importlib.util.spec_from_file_location(
-        "api.app", os.path.join(PROJECT_ROOT, "api", "app.py")
-    )
-    module = importlib.util.module_from_spec(spec)
-    spec.loader.exec_module(module)
-    app = module.app
+spec = importlib.util.spec_from_file_location(
+    "api.app", os.path.join(PROJECT_ROOT, "api", "app.py")
+)
+module = importlib.util.module_from_spec(spec)
+spec.loader.exec_module(module)
+app = module.app
+
+# Injection directe du mock dans la variable globale du module
+# (le lifespan ne s'exécute pas sans context manager — on bypass)
+module.model = mock_model
 
 client = TestClient(app)
 

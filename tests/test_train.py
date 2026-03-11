@@ -62,6 +62,7 @@ def test_train_saves_model(tmp_path):
                 patch("mlflow.start_run") as mock_run,
                 patch("mlflow.log_params"),
                 patch("mlflow.log_metric"),
+                patch("mlflow.sklearn.log_model"),
                 patch("mlflow.log_artifact"),
                 patch.multiple("src.train", **patches),
             ):

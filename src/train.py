@@ -17,9 +17,9 @@ from sklearn.metrics import (
 from sklearn.model_selection import train_test_split
 from sklearn.multioutput import MultiOutputClassifier
 
-INPUT_PATH = "data/processed/hydraulic_clean.csv"
-MODEL_PATH = "models/model.pkl"
-METRICS_PATH = "reports/model_metrics.json"
+INPUT_PATH = os.getenv("INPUT_PATH", "data/processed/hydraulic_clean.csv")
+MODEL_PATH = os.getenv("MODEL_PATH", "models/model.pkl")
+METRICS_PATH = os.getenv("METRICS_PATH", "reports/model_metrics.json")
 
 FEATURES = [
     "PS1",
@@ -48,9 +48,9 @@ TARGETS = [
     "accumulator_pressure",
 ]
 
-N_ESTIMATORS = 100
-TEST_SIZE = 0.2
-RANDOM_STATE = 42
+N_ESTIMATORS = int(os.getenv("N_ESTIMATORS", "100"))
+TEST_SIZE = float(os.getenv("TEST_SIZE", "0.2"))
+RANDOM_STATE = int(os.getenv("RANDOM_STATE", "42"))
 
 
 def train() -> None:
@@ -149,7 +149,7 @@ def train() -> None:
             }
 
         joblib.dump(model, MODEL_PATH)
-        mlflow.log_artifact(MODEL_PATH, artifact_path="model")
+        mlflow.sklearn.log_model(model, "model")
 
         with open(METRICS_PATH, "w", encoding="utf-8") as f:
             json.dump(metrics, f, indent=2)

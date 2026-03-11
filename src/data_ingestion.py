@@ -1,3 +1,4 @@
+import os
 import zipfile
 from pathlib import Path
 
@@ -8,7 +9,7 @@ DATA_URL = (
     "https://archive.ics.uci.edu/static/public/447/condition+monitoring+of+hydraulic+systems.zip"
 )
 
-RAW_DIR = Path("data/raw")
+RAW_DIR = Path(os.getenv("RAW_DIR", "data/raw"))
 ZIP_PATH = RAW_DIR / "hydraulic.zip"
 EXTRACT_DIR = RAW_DIR / "hydraulic"
 OUTPUT_CSV = RAW_DIR / "hydraulic_data.csv"

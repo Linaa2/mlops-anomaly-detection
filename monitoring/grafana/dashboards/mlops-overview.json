@@ -1,93 +1,191 @@
 {
   "title": "MLOps Overview",
   "uid": "mlops-overview",
-  "version": 1,
+  "version": 3,
   "schemaVersion": 36,
   "refresh": "10s",
+  "time": { "from": "now-15m", "to": "now" },
   "panels": [
+
     {
       "id": 1,
-      "title": "API — Requests per second",
+      "title": "API — Requests/s par endpoint",
       "type": "timeseries",
       "gridPos": { "x": 0, "y": 0, "w": 12, "h": 8 },
       "targets": [
         {
-          "expr": "rate(http_requests_total{job=\"fastapi\"}[1m])",
-          "legendFormat": "{{method}} {{endpoint}}"
+          "expr": "sum by(handler) (rate(http_requests_total[1m]))",
+          "legendFormat": "{{handler}}"
         }
-      ]
+      ],
+      "fieldConfig": {
+        "defaults": { "unit": "reqps", "color": { "mode": "palette-classic" } }
+      }
     },
+
     {
       "id": 2,
-      "title": "API — Latency p95 (ms)",
+      "title": "API — Latence p50 / p95 (ms)",
       "type": "timeseries",
       "gridPos": { "x": 12, "y": 0, "w": 12, "h": 8 },
       "targets": [
         {
-          "expr": "histogram_quantile(0.95, rate(http_request_duration_seconds_bucket{job=\"fastapi\"}[5m])) * 1000",
-          "legendFormat": "p95 latency"
+          "expr": "histogram_quantile(0.95, sum by(le) (rate(http_request_duration_seconds_bucket{handler=\"/predict\"}[5m]))) * 1000",
+          "legendFormat": "p95"
+        },
+        {
+          "expr": "histogram_quantile(0.50, sum by(le) (rate(http_request_duration_seconds_bucket{handler=\"/predict\"}[5m]))) * 1000",
+          "legendFormat": "p50"
         }
-      ]
+      ],
+      "fieldConfig": {
+        "defaults": { "unit": "ms", "color": { "mode": "palette-classic" } }
+      }
     },
+
     {
       "id": 3,
-      "title": "API — Error rate (%)",
+      "title": "API — Taux d'erreur (%)",
       "type": "stat",
-      "gridPos": { "x": 0, "y": 8, "w": 6, "h": 4 },
+      "gridPos": { "x": 0, "y": 8, "w": 6, "h": 5 },
       "targets": [
         {
-          "expr": "rate(http_requests_total{job=\"fastapi\", status=~\"5..\"}[5m]) / rate(http_requests_total{job=\"fastapi\"}[5m]) * 100",
-          "legendFormat": "Error %"
+          "expr": "sum(rate(http_requests_total{status=~\"4..|5..\"}[5m])) / sum(rate(http_requests_total[5m])) * 100",
+          "legendFormat": "Erreur %"
         }
-      ]
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "percent",
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              { "color": "green", "value": null },
+              { "color": "yellow", "value": 1 },
+              { "color": "red", "value": 5 }
+            ]
+          }
+        }
+      }
     },
+
     {
       "id": 4,
-      "title": "Anomaly Detection — Predictions/min",
-      "type": "timeseries",
-      "gridPos": { "x": 6, "y": 8, "w": 18, "h": 4 },
+      "title": "Modèle — Prédictions/min",
+      "type": "stat",
+      "gridPos": { "x": 6, "y": 8, "w": 6, "h": 5 },
       "targets": [
         {
-          "expr": "rate(model_predictions_total[1m])",
-          "legendFormat": "predictions/min"
+          "expr": "rate(model_predictions_total[1m]) * 60",
+          "legendFormat": "pred/min"
         }
-      ]
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "short",
+          "color": { "fixedColor": "blue", "mode": "fixed" }
+        }
+      }
     },
+
     {
       "id": 5,
-      "title": "Anomaly Score — Distribution",
-      "type": "histogram",
-      "gridPos": { "x": 0, "y": 12, "w": 12, "h": 8 },
+      "title": "Modèle — Latence inférence p50 / p95 (ms)",
+      "type": "timeseries",
+      "gridPos": { "x": 12, "y": 8, "w": 12, "h": 5 },
       "targets": [
         {
-          "expr": "model_anomaly_score_bucket",
-          "legendFormat": "score"
+          "expr": "histogram_quantile(0.95, rate(model_prediction_latency_seconds_bucket[5m])) * 1000",
+          "legendFormat": "p95"
+        },
+        {
+          "expr": "histogram_quantile(0.50, rate(model_prediction_latency_seconds_bucket[5m])) * 1000",
+          "legendFormat": "p50"
         }
-      ]
+      ],
+      "fieldConfig": {
+        "defaults": { "unit": "ms" }
+      }
     },
+
     {
       "id": 6,
-      "title": "Airflow — DAG success rate",
-      "type": "stat",
-      "gridPos": { "x": 12, "y": 12, "w": 6, "h": 8 },
+      "title": "Modèle — Distribution des classes prédites",
+      "type": "timeseries",
+      "gridPos": { "x": 0, "y": 13, "w": 24, "h": 8 },
       "targets": [
         {
-          "expr": "airflow_dag_success_total / (airflow_dag_success_total + airflow_dag_failed_total) * 100",
-          "legendFormat": "success %"
+          "expr": "rate(model_prediction_class_total{target=\"cooler_condition\"}[2m])",
+          "legendFormat": "cooler — classe {{predicted_class}}"
+        },
+        {
+          "expr": "rate(model_prediction_class_total{target=\"valve_condition\"}[2m])",
+          "legendFormat": "valve — classe {{predicted_class}}"
+        },
+        {
+          "expr": "rate(model_prediction_class_total{target=\"pump_leakage\"}[2m])",
+          "legendFormat": "pompe — classe {{predicted_class}}"
+        },
+        {
+          "expr": "rate(model_prediction_class_total{target=\"accumulator_pressure\"}[2m])",
+          "legendFormat": "accum — classe {{predicted_class}}"
         }
-      ]
+      ],
+      "fieldConfig": {
+        "defaults": { "unit": "reqps", "color": { "mode": "palette-classic" } }
+      }
     },
+
     {
       "id": 7,
-      "title": "MLflow — Active runs",
-      "type": "stat",
-      "gridPos": { "x": 18, "y": 12, "w": 6, "h": 8 },
+      "title": "Système — CPU (%)",
+      "type": "timeseries",
+      "gridPos": { "x": 0, "y": 21, "w": 12, "h": 7 },
       "targets": [
         {
-          "expr": "mlflow_active_runs",
-          "legendFormat": "active runs"
+          "expr": "100 - (avg by(instance) (rate(node_cpu_seconds_total{mode=\"idle\"}[5m])) * 100)",
+          "legendFormat": "CPU %"
         }
-      ]
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "percent", "min": 0, "max": 100,
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              { "color": "green", "value": null },
+              { "color": "yellow", "value": 70 },
+              { "color": "red", "value": 90 }
+            ]
+          }
+        }
+      }
+    },
+
+    {
+      "id": 8,
+      "title": "Système — Mémoire utilisée (%)",
+      "type": "timeseries",
+      "gridPos": { "x": 12, "y": 21, "w": 12, "h": 7 },
+      "targets": [
+        {
+          "expr": "(1 - node_memory_MemAvailable_bytes / node_memory_MemTotal_bytes) * 100",
+          "legendFormat": "RAM %"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "percent", "min": 0, "max": 100,
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              { "color": "green", "value": null },
+              { "color": "yellow", "value": 75 },
+              { "color": "red", "value": 90 }
+            ]
+          }
+        }
+      }
     }
   ]
 }

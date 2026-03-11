@@ -31,7 +31,7 @@ jobs:
       - name: Set up Python
         uses: actions/setup-python@v5
         with:
-          python-version: "3.10"
+          python-version: "3.11"
 
       - name: Install dependencies
         run: uv sync --dev
@@ -151,6 +151,10 @@ jobs:
         run: |
           kubectl create secret generic mlops-secrets \
             --from-literal=MLFLOW_TRACKING_URI=${{ secrets.MLFLOW_TRACKING_URI }} \
+            --from-literal=MLFLOW_MODEL_NAME=${{ secrets.MLFLOW_MODEL_NAME || 'HydraulicConditionModel' }} \
+            --from-literal=MINIO_ENDPOINT_URL=${{ secrets.MINIO_ENDPOINT_URL }} \
+            --from-literal=MINIO_ACCESS_KEY=${{ secrets.MINIO_ACCESS_KEY }} \
+            --from-literal=MINIO_SECRET_KEY=${{ secrets.MINIO_SECRET_KEY }} \
             --namespace mlops \
             --dry-run=client -o yaml | kubectl apply -f -
 
