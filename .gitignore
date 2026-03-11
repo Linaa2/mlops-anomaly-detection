@@ -33,4 +33,23 @@ mlflow.db
 
 # Generated reports
 reports/
+
+# Test artifacts
+.coverage
+htmlcov/
+.pytest_cache/
+
+# LaTeX build artifacts
+docs/*.aux
+docs/*.log
+docs/*.nav
+docs/*.out
+docs/*.snm
+docs/*.toc
+docs/*.vrb
+
+# Docs build
 docs/build/
+
+# macOS
+.DS_Store

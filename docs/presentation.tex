@@ -1,0 +1,588 @@
+\documentclass[aspectratio=169, 11pt]{beamer}
+
+% ── Theme & Colors ───────────────────────────────────────────
+\usetheme{Madrid}
+\usecolortheme{default}
+
+\definecolor{tptblue}{RGB}{0, 62, 110}
+\definecolor{tptlight}{RGB}{0, 120, 180}
+\definecolor{tptgray}{RGB}{100, 100, 100}
+\definecolor{okgreen}{RGB}{34, 139, 34}
+\definecolor{warnor}{RGB}{200, 120, 0}
+
+\setbeamercolor{structure}{fg=tptblue}
+\setbeamercolor{frametitle}{bg=tptblue, fg=white}
+\setbeamercolor{title}{fg=white, bg=tptblue}
+\setbeamercolor{block title}{bg=tptblue, fg=white}
+\setbeamercolor{block body}{bg=tptblue!5}
+\setbeamercolor{item}{fg=tptblue}
+
+\setbeamertemplate{navigation symbols}{}
+\setbeamertemplate{footline}{%
+  \leavevmode\hbox{%
+    \begin{beamercolorbox}[wd=.33\paperwidth,ht=2.5ex,dp=1ex,center]{author in head/foot}%
+      \usebeamerfont{author in head/foot}\insertshortauthor
+    \end{beamercolorbox}%
+    \begin{beamercolorbox}[wd=.34\paperwidth,ht=2.5ex,dp=1ex,center]{title in head/foot}%
+      \usebeamerfont{title in head/foot}DATA713 --- MLOps
+    \end{beamercolorbox}%
+    \begin{beamercolorbox}[wd=.33\paperwidth,ht=2.5ex,dp=1ex,right]{date in head/foot}%
+      \insertframenumber{} / \inserttotalframenumber\hspace*{2em}
+    \end{beamercolorbox}}%
+}
+
+% ── Packages ─────────────────────────────────────────────────
+\usepackage[utf8]{inputenc}
+\usepackage[T1]{fontenc}
+\usepackage{graphicx}
+\usepackage{booktabs}
+\usepackage{tabularx}
+\usepackage{multicol}
+\usepackage{tikz}
+\usetikzlibrary{arrows.meta, positioning, shapes.geometric, fit, calc}
+\usepackage{fontawesome5}
+\usepackage{hyperref}
+
+% ── Screenshot placeholder command ───────────────────────────
+% Replace \screenshot{filename}{caption} with actual images when ready
+\newcommand{\screenshot}[2]{%
+  \begin{tikzpicture}
+    \node[draw=tptgray, dashed, rounded corners, minimum width=5cm, minimum height=3cm,
+          fill=tptgray!5, font=\small\color{tptgray}, align=center] {%
+      \faCamera\hspace{4pt}SCREENSHOT\\[4pt]#2};
+  \end{tikzpicture}%
+}
+% To insert a real screenshot, replace with:
+%   \includegraphics[width=\linewidth]{screenshots/filename.png}
+
+% ── Meta ─────────────────────────────────────────────────────
+\title[Hydraulic Condition Monitoring]{Monitoring de syst\`emes hydrauliques\\[4pt]\small Pipeline MLOps --- De l'entra\^inement \`a la production}
+\author[Groupe MLOps]{Lina Rhiati Hazime \quad Mohammed Horache \quad Benjamin Lepourtois \quad Gr\'egoire Petit}
+\institute{\includegraphics[height=1cm]{logo_telecom_ipparis_rvb_fond_h-770x360.png}}
+\date{DATA713 --- Mars 2026}
+
+\begin{document}
+
+% ═══════════════════════════════════════════════════════════════
+% SLIDE 1 — Titre (30s)
+% ═══════════════════════════════════════════════════════════════
+\begin{frame}[plain]
+  \titlepage
+\end{frame}
+
+% ═══════════════════════════════════════════════════════════════
+% SLIDE 2 — Contexte & Probl\`eme (30s)
+% Pourquoi cette formulation ? Pourquoi pas de la d\'etection d'anomalies ?
+% ═══════════════════════════════════════════════════════════════
+\begin{frame}{Contexte \& Probl\'ematique}
+
+\begin{columns}[T]
+  \begin{column}{0.55\textwidth}
+    \textbf{Cas d'usage :} Maintenance pr\'edictive industrielle\\[6pt]
+    \textbf{Dataset :} UCI --- Condition Monitoring of Hydraulic Systems
+    \begin{itemize}
+      \item 2205 cycles $\times$ 17 capteurs
+      \item 4 \'etats de composants \`a pr\'edire simultan\'ement
+      \item Labels issus de \texttt{profile.txt} (supervis\'e)
+    \end{itemize}
+    \vspace{8pt}
+    \textbf{Formulation :} Classification multi-classe multi-output\\[4pt]
+    {\small\color{tptgray}\faArrowRight\hspace{4pt} Pourquoi pas d\'etection d'anomalies ? Donn\'ees labellis\'ees\\ $\to$ diagnostic par composant plus actionnable}
+  \end{column}
+
+  \begin{column}{0.42\textwidth}
+    \small
+    \begin{tabular}{@{}lll@{}}
+      \toprule
+      \textbf{Cible} & \textbf{Composant} & \textbf{Classes} \\
+      \midrule
+      cooler & Refroidisseur & 3 \\
+      valve & Vanne & 4 \\
+      pump & Pompe & 3 \\
+      accumulator & Accumulateur & 4 \\
+      \bottomrule
+    \end{tabular}
+    \vspace{10pt}
+
+    \textbf{17 capteurs :}\\
+    {\footnotesize PS1--PS6, EPS1, FS1--FS2,\\TS1--TS4, VS1, CE, CP, SE}\\[4pt]
+    {\footnotesize Feature eng. : moyenne par cycle}
+  \end{column}
+\end{columns}
+
+\end{frame}
+
+% ═══════════════════════════════════════════════════════════════
+% SLIDE 3 — Vue d'ensemble de l'architecture (1m30)
+% Justifier : pourquoi ces composants, pourquoi Docker Compose, pourquoi K8s ready
+% ═══════════════════════════════════════════════════════════════
+\begin{frame}[fragile]{Vue d'ensemble de l'architecture}
+
+\centering
+\begin{tikzpicture}[
+    node distance=0.6cm and 0.9cm,
+    box/.style={draw, rounded corners, minimum height=0.8cm, minimum width=2cm, font=\footnotesize, fill=#1!10, draw=#1!60},
+    box/.default=tptblue,
+    arrow/.style={-{Stealth[length=5pt]}, thick, tptblue!70},
+    lbl/.style={font=\scriptsize\color{tptgray}, align=center},
+  ]
+
+  % Couche donn\'ees
+  \node[box=tptblue] (uci) {UCI Dataset};
+  \node[box=tptlight, right=of uci] (datapipe) {data\_pipeline};
+  \node[box=tptlight, right=of datapipe] (trainpipe) {training\_pipeline};
+
+  % MLflow
+  \node[box=warnor, below=0.7cm of trainpipe] (mlflow) {MLflow};
+
+  % Couche serving
+  \node[box=okgreen, right=1.5cm of trainpipe] (api) {FastAPI};
+  \node[box=okgreen, right=of api] (webapp) {Streamlit};
+
+  % Monitoring
+  \node[box=red, below=0.7cm of api] (prom) {Prometheus};
+  \node[box=red, right=of prom] (grafana) {Grafana};
+
+  % Labels
+  \node[lbl, above=0.2cm of datapipe] {Airflow DAG\\@daily};
+  \node[lbl, above=0.2cm of trainpipe] {Airflow DAG\\event-driven};
+  \node[lbl, above=0.2cm of api] {/predict\\{\tiny /health, /metrics}};
+  \node[lbl, above=0.2cm of webapp] {2 onglets :\\{\tiny pr\'ediction + \'eval}};
+
+  % Fl\`eches
+  \draw[arrow] (uci) -- (datapipe);
+  \draw[arrow] (datapipe) -- node[above, font=\scriptsize] {trigger} (trainpipe);
+  \draw[arrow] (trainpipe) -- (mlflow);
+  \draw[arrow] (trainpipe) -- node[above, font=\scriptsize] {model.pkl} (api);
+  \draw[arrow] (api) -- (webapp);
+  \draw[arrow] (api) -- (prom);
+  \draw[arrow] (prom) -- (grafana);
+  \draw[arrow, dashed, tptgray] (mlflow) -- node[left, font=\scriptsize, text=tptgray] {registry} (api);
+
+  % Cadre Docker Compose
+  \node[draw=tptgray, dashed, rounded corners, fit=(datapipe)(trainpipe)(mlflow)(api)(webapp)(prom)(grafana),
+        inner sep=10pt, label={[font=\scriptsize\color{tptgray}]below left:Docker Compose --- 9 services}] {};
+
+\end{tikzpicture}
+
+\vspace{6pt}
+\begin{columns}[T]
+  \begin{column}{0.48\textwidth}
+    \footnotesize
+    \textbf{Pourquoi Docker Compose ?}\\
+    Un seul \texttt{docker compose up} $\to$ 9 services.\\
+    Reproductible, aucune installation manuelle.
+  \end{column}
+  \begin{column}{0.48\textwidth}
+    \footnotesize
+    \textbf{Pourquoi des manifests K8s ?}\\
+    Pipeline CD pr\^et pour la production. D\'eploiement\\
+    conditionnel au secret \texttt{KUBECONFIG}.
+  \end{column}
+\end{columns}
+
+\end{frame}
+
+% ═══════════════════════════════════════════════════════════════
+% SLIDE 4 — Pipeline ML & Continuous Training (1m30)
+% Justifier : choix du mod\`ele, CT sur donn\'ees statiques, logique promote/reject
+% ═══════════════════════════════════════════════════════════════
+\begin{frame}{Pipeline ML \& Continuous Training}
+
+\begin{columns}[T]
+  \begin{column}{0.52\textwidth}
+    \textbf{Mod\`ele :} \texttt{MultiOutputClassifier(RF)}\\
+    {\scriptsize\color{tptgray} Pourquoi ? Un seul entra\^inement, features coh\'erentes, d\'eploiement plus simple que 4 mod\`eles}\\[4pt]
+
+    \textbf{R\'esultats (test set 20\%) :}\\[2pt]
+    \small
+    \begin{tabular}{@{}lccc@{}}
+      \toprule
+      \textbf{Cible} & \textbf{Acc.} & \textbf{F1\textsubscript{macro}} & \textbf{F1\textsubscript{w.}} \\
+      \midrule
+      Cooler     & 1.000 & 1.000 & 1.000 \\
+      Valve      & 0.948 & 0.947 & 0.948 \\
+      Pump       & 0.993 & 0.993 & 0.993 \\
+      Accumulator & 0.990 & 0.990 & 0.990 \\
+      \bottomrule
+    \end{tabular}
+
+    \vspace{6pt}
+    \textbf{Choix de conception :}
+    \begin{itemize}\scriptsize\setlength\itemsep{1pt}
+      \item F1 macro pour la comparaison (g\`ere le d\'es\'equilibre)
+      \item DAG d\'el\`egue \`a \texttt{src/train.py} (s\'eparation des responsabilit\'es)
+      \item Promotion seulement si F1\textsubscript{new} $>$ F1\textsubscript{prod}
+    \end{itemize}
+  \end{column}
+
+  \begin{column}{0.45\textwidth}
+    \textbf{Logique CT (2 DAGs) :}\\[4pt]
+    \footnotesize
+    \begin{tikzpicture}[
+      node distance=0.4cm,
+      task/.style={draw, rounded corners=3pt, minimum width=2.8cm, minimum height=0.5cm, font=\scriptsize, fill=tptblue!8, draw=tptblue!50},
+      arr/.style={-{Stealth[length=4pt]}, tptblue!60},
+    ]
+      \node[task] (dl) {download\_dataset};
+      \node[task, below=of dl] (uz) {unzip};
+      \node[task, below=of uz] (mg) {merge\_sensors};
+      \node[task, below=of mg] (pp) {preprocess};
+      \node[task, below=of pp] (sa) {sample 80\%};
+      \node[task, below=of sa] (tr) {trigger\_training};
+
+      \draw[arr] (dl)--(uz); \draw[arr] (uz)--(mg);
+      \draw[arr] (mg)--(pp); \draw[arr] (pp)--(sa);
+      \draw[arr] (sa)--(tr);
+
+      \node[task, right=0.6cm of sa, fill=warnor!10, draw=warnor!50] (tm) {train\_model};
+      \node[task, below=of tm, fill=warnor!10, draw=warnor!50] (pr) {promote\_or\_reject};
+
+      \draw[arr, warnor!60] (tr.east) -- ++(0.2,0) |- (tm.west);
+      \draw[arr, warnor!60] (tm)--(pr);
+
+      \node[font=\scriptsize\color{tptgray}, above=0.1cm of dl] {@daily};
+      \node[font=\scriptsize\color{tptgray}, above=0.1cm of tm] {event-driven};
+    \end{tikzpicture}
+
+    \vspace{6pt}
+    {\scriptsize \textbf{Pourquoi \'echantillonner 80\% ?}\\
+    Dataset statique $\to$ l'\'echantillonnage simule\\la variabilit\'e, rendant la comparaison\\champion/challenger pertinente.}
+  \end{column}
+\end{columns}
+
+\end{frame}
+
+% ═══════════════════════════════════════════════════════════════
+% SLIDE 5 — Pipeline CI/CD (45s)
+% Justifier : pourquoi double registry, pourquoi K8s conditionnel, pourquoi uv
+% ═══════════════════════════════════════════════════════════════
+\begin{frame}[fragile]{Pipeline CI/CD}
+
+\begin{columns}[T]
+  \begin{column}{0.48\textwidth}
+    \textbf{CI} {\small (chaque push \& PR)}\\[4pt]
+    \begin{tikzpicture}[
+      node distance=0.35cm,
+      cibox/.style={draw, rounded corners=3pt, minimum width=3.5cm, minimum height=0.55cm, font=\small, fill=okgreen!8, draw=okgreen!50},
+      arr/.style={-{Stealth[length=4pt]}, okgreen!60},
+    ]
+      \node[cibox] (lint) {\faCheck\hspace{4pt}ruff check};
+      \node[cibox, below=of lint] (test) {\faCheck\hspace{4pt}pytest (26 tests)};
+      \draw[arr] (lint)--(test);
+    \end{tikzpicture}
+
+    \vspace{6pt}
+    \textbf{26 tests en 3 suites :}
+    \small
+    \begin{tabular}{@{}lrp{3cm}@{}}
+      \toprule
+      \textbf{Suite} & \textbf{\#} & \textbf{V\'erifie} \\
+      \midrule
+      DAGs & 9 & {\scriptsize structure, task IDs, deps} \\
+      Model & 7 & {\scriptsize entra\^inement, F1, features} \\
+      Preproc. & 10 & {\scriptsize merge, filtre, NaN} \\
+      \bottomrule
+    \end{tabular}
+  \end{column}
+
+  \begin{column}{0.48\textwidth}
+    \textbf{CD} {\small (push sur main)}\\[4pt]
+    \begin{tikzpicture}[
+      node distance=0.35cm,
+      cdbox/.style={draw, rounded corners=3pt, minimum width=3.8cm, minimum height=0.55cm, font=\small, fill=tptlight!10, draw=tptlight!50},
+      arr/.style={-{Stealth[length=4pt]}, tptlight!60},
+      skipbox/.style={draw, rounded corners=3pt, minimum width=3.8cm, minimum height=0.55cm, font=\small, fill=tptgray!10, draw=tptgray!40, text=tptgray},
+    ]
+      \node[cdbox] (test) {Run tests};
+      \node[cdbox, below=of test] (build) {Build Docker images};
+      \node[cdbox, below=of build] (push) {Push GHCR + DockerHub};
+      \node[cdbox, below=of push] (check) {check-deploy (secrets?)};
+      \node[skipbox, below=of check] (deploy) {\faForward\hspace{4pt}Deploy K8s (skip)};
+      \draw[arr] (test)--(build); \draw[arr] (build)--(push);
+      \draw[arr] (push)--(check); \draw[arr, dashed, tptgray!60] (check)--(deploy);
+    \end{tikzpicture}
+
+    \vspace{4pt}
+    {\scriptsize \textbf{Double registry :} GHCR + DockerHub (redondance)}\\
+    {\scriptsize \textbf{Tags :} \texttt{latest} + git SHA $\to$ rollback possible}\\
+    {\scriptsize \textbf{Gestionnaire :} \texttt{uv} (rapide, lockfile, reproductible)}
+  \end{column}
+\end{columns}
+
+\end{frame}
+
+% ═══════════════════════════════════════════════════════════════
+% SLIDE 6 — API + WebApp + Monitoring (1m)
+% Justifier : pourquoi FastAPI, pourquoi 2 onglets, pourquoi Prometheus+Grafana
+% ═══════════════════════════════════════════════════════════════
+\begin{frame}{API, WebApp \& Monitoring}
+
+\begin{columns}[T]
+  \begin{column}{0.32\textwidth}
+    \textbf{\faServer\hspace{4pt}FastAPI}\\[4pt]
+    \small
+    \begin{itemize}\setlength\itemsep{2pt}
+      \item \texttt{POST /predict}\\{\scriptsize Validation Pydantic\\17 capteurs $\to$ 4 \'etats}
+      \item \texttt{GET /health}\\{\scriptsize Sonde K8s readiness}
+      \item \texttt{GET /metrics}\\{\scriptsize Scraping Prometheus}
+      \item \texttt{GET /docs}\\{\scriptsize Swagger auto-g\'en\'er\'e}
+    \end{itemize}
+  \end{column}
+
+  \begin{column}{0.32\textwidth}
+    \textbf{\faDesktop\hspace{4pt}Streamlit}\\[4pt]
+    \small
+    \textbf{Onglet 1 --- Pr\'ediction}
+    \begin{itemize}\setlength\itemsep{1pt}
+      \item 17 champs capteurs
+      \item Appel API $\to$ 4 \'etats
+    \end{itemize}
+    \vspace{4pt}
+    \textbf{Onglet 2 --- \'Evaluation}
+    \begin{itemize}\setlength\itemsep{1pt}
+      \item M\'etriques par cible
+      \item Matrices de confusion
+      \item Rapports de classification
+    \end{itemize}
+    {\scriptsize\color{tptgray} Via \texttt{model\_metrics.json}}
+  \end{column}
+
+  \begin{column}{0.32\textwidth}
+    \textbf{\faChartBar\hspace{4pt}Monitoring}\\[4pt]
+    \small
+    \begin{itemize}\setlength\itemsep{2pt}
+      \item \textbf{Prometheus}\\{\scriptsize Scrape \texttt{/metrics}\\+ Node Exporter}
+      \item \textbf{Grafana}\\{\scriptsize Dashboard auto-provisionn\'e\\au \texttt{compose up}}
+      \item \textbf{Alerting}\\{\scriptsize Callbacks email Airflow\\en cas d'\'echec DAG}
+    \end{itemize}
+  \end{column}
+\end{columns}
+
+\vspace{6pt}
+\centering
+{\small\color{tptgray} \faArrowRight\hspace{4pt} Captures d'\'ecran dans les slides backup}
+
+\end{frame}
+
+% ═══════════════════════════════════════════════════════════════
+% SLIDE 7 — Collaboration & Le\c{c}ons apprises (45s)
+% Justifier : r\'epartition, workflow git, limites honn\^etes
+% ═══════════════════════════════════════════════════════════════
+\begin{frame}{Collaboration \& Le\c{c}ons apprises}
+
+\begin{columns}[T]
+  \begin{column}{0.48\textwidth}
+    \textbf{Organisation de l'\'equipe :}\\[4pt]
+    \small
+    \begin{tabular}{@{}lp{5cm}@{}}
+      \toprule
+      \textbf{Qui} & \textbf{P\'erim\`etre} \\
+      \midrule
+      Lina & Donn\'ees \& pipeline ML, MLflow \\
+      Gr\'egoire & Airflow, CT, CI/CD, tests, docs \\
+      Benjamin & API FastAPI, webapp Streamlit \\
+      Mohammed & Docker, K8s, CD, monitoring \\
+      \bottomrule
+    \end{tabular}
+
+    \vspace{6pt}
+    \textbf{Workflow Git :}
+    \begin{itemize}\small
+      \item Feature branches $\to$ PR $\to$ main
+      \item CI obligatoire sur chaque PR
+      \item 20+ PRs, conventional commits
+      \item Reviews Copilot
+    \end{itemize}
+  \end{column}
+
+  \begin{column}{0.48\textwidth}
+    \textbf{Limites assum\'ees :}
+    \begin{itemize}\small\setlength\itemsep{3pt}
+      \item Dataset statique --- CT con\c{c}u pour la prod mais valid\'e sur donn\'ees \'echantillonn\'ees
+      \item Pas de cluster K8s --- pipeline CD pr\^et, deploy skip
+      \item API charge \texttt{model.pkl} localement\\{\scriptsize (en prod : requête au MLflow Registry)}
+      \item Imports lourds dans les DAGs $\to$ diff\'er\'es dans les fonctions (limite 30s parsing)
+    \end{itemize}
+
+    \vspace{4pt}
+    \textbf{Principe cl\'e de conception :}\\
+    {\small S\'eparation des responsabilit\'es :\\
+    \texttt{src/} = logique m\'etier, \texttt{dags/} = orchestration,\\
+    \texttt{api/} = serving, \texttt{webapp/} = IHM}
+  \end{column}
+\end{columns}
+
+\end{frame}
+
+% ═══════════════════════════════════════════════════════════════
+% SLIDE 8 — Couverture des objectifs (30s)
+% ═══════════════════════════════════════════════════════════════
+\begin{frame}{Couverture des objectifs}
+
+\small
+\begin{columns}[T]
+  \begin{column}{0.55\textwidth}
+    \textbf{10/10 objectifs requis :}\\[3pt]
+    \scriptsize
+    \begin{tabular}{@{}clc@{}}
+      \toprule
+      \# & \textbf{Objectif} & \textbf{Statut} \\
+      \midrule
+      1 & Extraction \& pr\'etraitement des donn\'ees & \textcolor{okgreen}{\faCheckCircle} \\
+      2 & Mod\`ele ML & \textcolor{okgreen}{\faCheckCircle} \\
+      3 & Model registry (MLflow) & \textcolor{okgreen}{\faCheckCircle} \\
+      4 & Pipeline Airflow de r\'eentra\^inement & \textcolor{okgreen}{\faCheckCircle} \\
+      5 & MLflow experiment tracking & \textcolor{okgreen}{\faCheckCircle} \\
+      6 & API (FastAPI + Swagger) & \textcolor{okgreen}{\faCheckCircle} \\
+      7 & WebApp (Streamlit, 2 onglets) & \textcolor{okgreen}{\faCheckCircle} \\
+      8 & Continuous Training (CT) & \textcolor{okgreen}{\faCheckCircle} \\
+      9 & Docker + K8s + CI/CD & \textcolor{okgreen}{\faCheckCircle} \\
+      10 & Versionnage GitHub \& docs & \textcolor{okgreen}{\faCheckCircle} \\
+      \bottomrule
+    \end{tabular}
+  \end{column}
+
+  \begin{column}{0.42\textwidth}
+    \textbf{Bonus r\'ealis\'es (3/8) :}\\[3pt]
+    \scriptsize
+    \begin{tabular}{@{}clc@{}}
+      \toprule
+      \# & \textbf{Bonus} & \\
+      \midrule
+      12 & Monitoring (Prom+Grafana) & \textcolor{okgreen}{\faCheckCircle} \\
+      14 & Versionnage mod\`ele / rollback & \textcolor{okgreen}{\faCheckCircle} \\
+      17 & Alerting email & \textcolor{okgreen}{\faCheckCircle} \\
+      \midrule
+      11 & Donn\'ees temps r\'eel & \textcolor{tptgray}{\faTimesCircle} \\
+      13 & Test de charge (Locust) & \textcolor{tptgray}{\faTimesCircle} \\
+      15 & Human in the loop & \textcolor{tptgray}{\faTimesCircle} \\
+      16 & Gestion acc\`es API & \textcolor{tptgray}{\faTimesCircle} \\
+      \bottomrule
+    \end{tabular}
+
+    \vspace{8pt}
+    \textbf{Stack :}\\[2pt]
+    {\scriptsize Python 3.11 $\cdot$ scikit-learn $\cdot$ MLflow\\
+    Airflow $\cdot$ FastAPI $\cdot$ Streamlit\\
+    Docker $\cdot$ K8s $\cdot$ GitHub Actions\\
+    Prometheus $\cdot$ Grafana $\cdot$ uv}
+  \end{column}
+\end{columns}
+
+\end{frame}
+
+% ═══════════════════════════════════════════════════════════════
+% SLIDES BACKUP — Captures d'\'ecran
+% Remplacer \screenshot par \includegraphics quand les images sont pr\^etes
+% ═══════════════════════════════════════════════════════════════
+\appendix
+
+% ── BACKUP 1 : Airflow UI ────────────────────────────────────
+\begin{frame}{Backup --- Airflow UI}
+  \begin{columns}[T]
+    \begin{column}{0.48\textwidth}
+      \centering
+      % SCREENSHOT 1 : Vue liste des DAGs Airflow
+      %   montrant les 2 DAGs (data_pipeline @daily + training_pipeline schedule=None)
+      % Remplacer par : \includegraphics[width=\linewidth]{screenshots/airflow-dags.png}
+      \screenshot{airflow-dags}{Liste des DAGs Airflow\\(data\_pipeline + training\_pipeline)}
+      {\scriptsize Vue liste des DAGs}
+    \end{column}
+    \begin{column}{0.48\textwidth}
+      \centering
+      % SCREENSHOT 2 : Graphe des t\^aches de data_pipeline
+      %   montrant les 6 t\^aches : download -> unzip -> merge -> preprocess -> sample -> trigger
+      % Remplacer par : \includegraphics[width=\linewidth]{screenshots/airflow-graph.png}
+      \screenshot{airflow-graph}{Graphe data\_pipeline\\(6 t\^aches cha\^in\'ees)}
+      {\scriptsize Vue graphe des t\^aches}
+    \end{column}
+  \end{columns}
+\end{frame}
+
+% ── BACKUP 2 : MLflow UI ─────────────────────────────────────
+\begin{frame}{Backup --- MLflow UI}
+  \begin{columns}[T]
+    \begin{column}{0.48\textwidth}
+      \centering
+      % SCREENSHOT 3 : Liste des runs MLflow
+      %   montrant l'exp\'erience "hydraulic-condition-monitoring" avec les m\'etriques F1
+      % Remplacer par : \includegraphics[width=\linewidth]{screenshots/mlflow-runs.png}
+      \screenshot{mlflow-runs}{Runs MLflow\\(m\'etriques F1 par cible)}
+      {\scriptsize Suivi des exp\'eriences}
+    \end{column}
+    \begin{column}{0.48\textwidth}
+      \centering
+      % SCREENSHOT 4 : MLflow Model Registry
+      %   montrant les versions avec les stages Production / Archived
+      % Remplacer par : \includegraphics[width=\linewidth]{screenshots/mlflow-registry.png}
+      \screenshot{mlflow-registry}{MLflow Model Registry\\(stages Production / Archived)}
+      {\scriptsize Versionnage des mod\`eles}
+    \end{column}
+  \end{columns}
+\end{frame}
+
+% ── BACKUP 3 : API & WebApp ──────────────────────────────────
+\begin{frame}{Backup --- API \& WebApp}
+  \begin{columns}[T]
+    \begin{column}{0.32\textwidth}
+      \centering
+      % SCREENSHOT 5 : Page Swagger /docs
+      %   montrant POST /predict avec le sch\'ema Pydantic (17 champs capteurs)
+      % Remplacer par : \includegraphics[width=\linewidth]{screenshots/swagger.png}
+      \screenshot{swagger}{Swagger /docs\\(sch\'ema Pydantic)}
+      {\scriptsize FastAPI}
+    \end{column}
+    \begin{column}{0.32\textwidth}
+      \centering
+      % SCREENSHOT 6 : Streamlit Onglet 1 — Pr\'ediction
+      %   montrant les 17 champs capteurs et les 4 \'etats pr\'edits
+      % Remplacer par : \includegraphics[width=\linewidth]{screenshots/streamlit-predict.png}
+      \screenshot{streamlit-predict}{Streamlit Onglet 1\\(formulaire pr\'ediction)}
+      {\scriptsize Pr\'ediction}
+    \end{column}
+    \begin{column}{0.32\textwidth}
+      \centering
+      % SCREENSHOT 7 : Streamlit Onglet 2 — \'Evaluation du mod\`ele
+      %   montrant les matrices de confusion et rapports de classification
+      % Remplacer par : \includegraphics[width=\linewidth]{screenshots/streamlit-eval.png}
+      \screenshot{streamlit-eval}{Streamlit Onglet 2\\(matrices de confusion)}
+      {\scriptsize \'Evaluation}
+    \end{column}
+  \end{columns}
+\end{frame}
+
+% ── BACKUP 4 : Monitoring & GitHub ───────────────────────────
+\begin{frame}{Backup --- Monitoring \& GitHub}
+  \begin{columns}[T]
+    \begin{column}{0.48\textwidth}
+      \centering
+      % SCREENSHOT 8 : Dashboard Grafana
+      %   montrant les m\'etriques API (taux de requ\^etes, latence, etc.)
+      % Remplacer par : \includegraphics[width=\linewidth]{screenshots/grafana.png}
+      \screenshot{grafana}{Dashboard Grafana\\(m\'etriques API + syst\`eme)}
+      {\scriptsize Monitoring}
+
+      \vspace{6pt}
+      % SCREENSHOT 9 : GitHub Actions — Pipeline CI vert
+      % Remplacer par : \includegraphics[width=\linewidth]{screenshots/github-ci.png}
+      \screenshot{github-ci}{GitHub Actions CI\\(ruff + pytest vert)}
+    \end{column}
+    \begin{column}{0.48\textwidth}
+      \centering
+      % SCREENSHOT 10 : Page des PRs GitHub
+      %   montrant les PRs merg\'ees avec les checks CI
+      % Remplacer par : \includegraphics[width=\linewidth]{screenshots/github-prs.png}
+      \screenshot{github-prs}{PRs GitHub\\(20+ merg\'ees, CI gates)}
+      {\scriptsize Collaboration}
+
+      \vspace{6pt}
+      % SCREENSHOT 11 : Pipeline CD GitHub (optionnel)
+      %   montrant le flow build -> push -> check-deploy -> deploy(skipped)
+      % Remplacer par : \includegraphics[width=\linewidth]{screenshots/github-cd.png}
+      \screenshot{github-cd}{Pipeline CD\\(build + push + check-deploy)}
+    \end{column}
+  \end{columns}
+\end{frame}
+
+\end{document}
