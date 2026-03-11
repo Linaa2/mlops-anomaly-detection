@@ -5,3 +5,5 @@ models/*.pkl
 data/
 mlruns/
 notebooks/
+context/
+.claude/
