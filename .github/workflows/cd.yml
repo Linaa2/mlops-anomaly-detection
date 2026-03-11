@@ -1,5 +1,5 @@
 # ============================================================
-# CD Pipeline — Build → Push DockerHub → Deploy K8s
+# CD Pipeline — Build → Push GHCR → Deploy K8s
 # Trigger : push sur main
 # ============================================================
 name: CD Pipeline
@@ -10,9 +10,10 @@ on:
   workflow_dispatch:
 
 env:
-  DOCKERHUB_USERNAME: ${{ secrets.DOCKERHUB_USERNAME }}
-  IMAGE_API: ${{ secrets.DOCKERHUB_USERNAME }}/mlops-api
-  IMAGE_WEBAPP: ${{ secrets.DOCKERHUB_USERNAME }}/mlops-webapp
+  GHCR_IMAGE_API: ghcr.io/${{ github.repository_owner }}/mlops-api
+  GHCR_IMAGE_WEBAPP: ghcr.io/${{ github.repository_owner }}/mlops-webapp
+  DH_IMAGE_API: ${{ secrets.DOCKERHUB_USERNAME }}/mlops-api
+  DH_IMAGE_WEBAPP: ${{ secrets.DOCKERHUB_USERNAME }}/mlops-webapp
 
 jobs:
 
@@ -27,21 +28,26 @@ jobs:
       - name: Set up Python
         uses: actions/setup-python@v5
         with:
-          python-version: "3.11"
+          python-version: "3.10"
 
       - name: Install dependencies
         run: |
           pip install uv
-          uv sync
+          uv sync --dev
 
       - name: Run tests
+        env:
+          MLFLOW_TRACKING_URI: ./mlruns
         run: uv run pytest tests/ -v --tb=short
 
   # ── 2. Build & Push Docker images ─────────────────────────
   build-push:
-    name: Build & Push to DockerHub
+    name: Build & Push to GHCR
     runs-on: ubuntu-latest
     needs: test
+    permissions:
+      contents: read
+      packages: write
     outputs:
       image_tag: ${{ steps.meta.outputs.version }}
     steps:
@@ -51,13 +57,20 @@ jobs:
       - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@v3
 
+      - name: Login to GHCR
+        uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
       - name: Login to DockerHub
         uses: docker/login-action@v3
         with:
           username: ${{ secrets.DOCKERHUB_USERNAME }}
           password: ${{ secrets.DOCKERHUB_TOKEN }}
 
-      - name: Extract metadata
+      - name: Extract image tag (short SHA)
         id: meta
         run: echo "version=$(git rev-parse --short HEAD)" >> $GITHUB_OUTPUT
 
@@ -68,8 +81,10 @@ jobs:
           file: api/Dockerfile
           push: true
           tags: |
-            ${{ env.IMAGE_API }}:latest
-            ${{ env.IMAGE_API }}:${{ steps.meta.outputs.version }}
+            ${{ env.GHCR_IMAGE_API }}:latest
+            ${{ env.GHCR_IMAGE_API }}:${{ steps.meta.outputs.version }}
+            ${{ env.DH_IMAGE_API }}:latest
+            ${{ env.DH_IMAGE_API }}:${{ steps.meta.outputs.version }}
           cache-from: type=gha
           cache-to: type=gha,mode=max
 
@@ -80,12 +95,14 @@ jobs:
           file: webapp/Dockerfile
           push: true
           tags: |
-            ${{ env.IMAGE_WEBAPP }}:latest
-            ${{ env.IMAGE_WEBAPP }}:${{ steps.meta.outputs.version }}
+            ${{ env.GHCR_IMAGE_WEBAPP }}:latest
+            ${{ env.GHCR_IMAGE_WEBAPP }}:${{ steps.meta.outputs.version }}
+            ${{ env.DH_IMAGE_WEBAPP }}:latest
+            ${{ env.DH_IMAGE_WEBAPP }}:${{ steps.meta.outputs.version }}
           cache-from: type=gha
           cache-to: type=gha,mode=max
 
-  # ── 3. Deploy sur K8s (skipped if KUBECONFIG secret is not set) ──
+  # ── 3. Deploy sur K8s ─────────────────────────────────────
   deploy:
     name: Deploy to Kubernetes
     runs-on: ubuntu-latest
@@ -116,12 +133,10 @@ jobs:
             --namespace mlops \
             --dry-run=client -o yaml | kubectl apply -f -
 
-      - name: Update image tags
+      - name: Update image tags in manifests
         run: |
-          sed -i "s|mlops-api:latest|mlops-api:${{ needs.build-push.outputs.image_tag }}|g" k8s/api-deployment.yaml
-          sed -i "s|mlops-webapp:latest|mlops-webapp:${{ needs.build-push.outputs.image_tag }}|g" k8s/webapp-deployment.yaml
-          sed -i "s|\$DOCKERHUB_USERNAME|${{ secrets.DOCKERHUB_USERNAME }}|g" k8s/api-deployment.yaml
-          sed -i "s|\$DOCKERHUB_USERNAME|${{ secrets.DOCKERHUB_USERNAME }}|g" k8s/webapp-deployment.yaml
+          sed -i "s|IMAGE_API|${{ env.GHCR_IMAGE_API }}:${{ needs.build-push.outputs.image_tag }}|g" k8s/api-deployment.yaml
+          sed -i "s|IMAGE_WEBAPP|${{ env.GHCR_IMAGE_WEBAPP }}:${{ needs.build-push.outputs.image_tag }}|g" k8s/webapp-deployment.yaml
 
       - name: Deploy to K8s
         run: |
