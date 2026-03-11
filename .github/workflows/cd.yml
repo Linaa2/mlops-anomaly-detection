@@ -105,6 +105,18 @@ jobs:
           cache-from: type=gha
           cache-to: type=gha,mode=max
 
+      - name: Build & Push Airflow image
+        uses: docker/build-push-action@v5
+        with:
+          context: .
+          file: airflow/Dockerfile
+          push: true
+          tags: |
+            ghcr.io/${{ steps.meta.outputs.owner }}/mlops-airflow:latest
+            ghcr.io/${{ steps.meta.outputs.owner }}/mlops-airflow:${{ steps.meta.outputs.version }}
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+
   # ── 3. Check secrets disponibles ──────────────────────────
   check-deploy:
     name: Check deploy secrets

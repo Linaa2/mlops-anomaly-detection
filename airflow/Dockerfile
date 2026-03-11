@@ -9,3 +9,8 @@ RUN pip install --no-cache-dir \
     numpy \
     joblib \
     boto3
+
+# Copy DAGs and source code into the image (used in prod, overridden by
+# bind-mounts in dev docker-compose.yml)
+COPY --chown=airflow:root airflow/dags/ /opt/airflow/dags/
+COPY --chown=airflow:root src/ /opt/airflow/src/
