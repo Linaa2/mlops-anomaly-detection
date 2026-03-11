@@ -18,6 +18,18 @@ dependencies = [
     "apache-airflow>=2.8,<3.0",
 ]
 
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+addopts = "--cov=src --cov-branch --cov-fail-under=0 --cov-report=term-missing"
+
+[tool.coverage.run]
+source = ["src"]
+omit = ["*/tests/*", "*/__pycache__/*"]
+
+[tool.bandit]
+targets = ["src"]
+skips = ["B101"]
+
 [tool.ruff]
 line-length = 100
 
@@ -28,5 +40,10 @@ select = ["E","F","I"]
 dev = [
     "pytest",
     "ruff",
-    "pre-commit"
+    "pre-commit",
+    "sphinx>=9.0.4",
+    "sphinx-rtd-theme>=3.1.0",
+    "bandit>=1.9.4",
+    "safety>=3.7.0",
+    "pytest-cov>=7.0.0",
 ]
