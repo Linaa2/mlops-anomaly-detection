@@ -13,9 +13,12 @@ import pytest
 PROJECT_ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 sys.path.insert(0, PROJECT_ROOT)
 
-from src.data_ingestion import SENSORS
+from src.data_ingestion import SENSORS  # noqa: E402
 
-PROFILE_COLS = ["cooler_condition", "valve_condition", "pump_leakage", "accumulator_pressure", "stable_flag"]
+PROFILE_COLS = [
+    "cooler_condition", "valve_condition",
+    "pump_leakage", "accumulator_pressure", "stable_flag",
+]
 
 
 def _create_sensor_files(extract_dir: Path, n_cycles: int = 50) -> None:

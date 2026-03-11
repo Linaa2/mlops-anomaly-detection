@@ -10,9 +10,12 @@ import pandas as pd
 PROJECT_ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 sys.path.insert(0, PROJECT_ROOT)
 
-import src.preprocess as preprocess_module
+import src.preprocess as preprocess_module  # noqa: E402
 
-FEATURES = getattr(preprocess_module, "FEATURES", None) or getattr(preprocess_module, "SENSORS", None)
+FEATURES = (
+    getattr(preprocess_module, "FEATURES", None)
+    or getattr(preprocess_module, "SENSORS", None)
+)
 HAS_STABLE_FLAG = hasattr(preprocess_module, "TARGETS")
 
 
