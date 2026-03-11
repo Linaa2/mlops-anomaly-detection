@@ -17,6 +17,9 @@ RUN pip install uv && uv sync --frozen --no-dev
 # Copier le code
 COPY webapp/ ./webapp/
 
+RUN useradd --create-home appuser
+USER appuser
+
 EXPOSE 8501
 
 HEALTHCHECK --interval=30s --timeout=10s --retries=3 \

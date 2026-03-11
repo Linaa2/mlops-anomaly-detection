@@ -2,7 +2,7 @@
 name = "mlops-anomaly-detection"
 version = "0.1.0"
 description = "MLOps anomaly detection project"
-requires-python = ">=3.10"
+requires-python = ">=3.11"
 
 dependencies = [
     "pandas",
@@ -11,14 +11,24 @@ dependencies = [
     "mlflow>=2.11",
     "fastapi",
     "uvicorn",
-    "pytest",
     "joblib",
-    "ruff",
     "streamlit>=1.55.0",
     "requests>=2.32.5",
     "prometheus-fastapi-instrumentator>=0.9.1",
     "apache-airflow>=2.8,<3.0",
 ]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+addopts = "--cov=src --cov-branch --cov-fail-under=0 --cov-report=term-missing"
+
+[tool.coverage.run]
+source = ["src"]
+omit = ["*/tests/*", "*/__pycache__/*"]
+
+[tool.bandit]
+targets = ["src"]
+skips = ["B101"]
 
 [tool.ruff]
 line-length = 100
@@ -30,5 +40,8 @@ select = ["E","F","I"]
 dev = [
     "pytest",
     "ruff",
-    "pre-commit"
+    "pre-commit",
+    "bandit>=1.9.4",
+    "safety>=3.7.0",
+    "pytest-cov>=7.0.0",
 ]

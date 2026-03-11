@@ -1,44 +1,108 @@
+import json
+import os
+from pathlib import Path
+
+import pandas as pd
 import requests
 import streamlit as st
 
-API_URL = "http://api:8000/predict"
+API_BASE = os.getenv("API_URL", "http://api:8000")
+API_URL = f"{API_BASE}/predict"
+METRICS_PATH = Path("reports/model_metrics.json")
 
-st.set_page_config(page_title="Weather Anomaly Detection", page_icon="🌦️")
+FEATURES = [
+    "PS1",
+    "PS2",
+    "PS3",
+    "PS4",
+    "PS5",
+    "PS6",
+    "EPS1",
+    "FS1",
+    "FS2",
+    "TS1",
+    "TS2",
+    "TS3",
+    "TS4",
+    "VS1",
+    "CE",
+    "CP",
+    "SE",
+]
 
-st.title("🌦️ Weather Anomaly Detection")
-st.write("Enter weather measurements to detect whether the conditions are anomalous.")
+st.set_page_config(page_title="Hydraulic Condition Monitor", layout="wide")
 
-temperature = st.number_input("Temperature", value=10.0)
-humidity = st.number_input("Humidity", value=70.0)
-wind_speed = st.number_input("Wind Speed", value=10.0)
-pressure = st.number_input("Pressure", value=1015.0)
-precipitation = st.number_input("Precipitation", value=0.0)
+st.title("Hydraulic Condition Prediction")
+st.write("Enter sensor values and get predicted component conditions.")
 
-if st.button("Predict"):
-    params = {
-        "temperature": temperature,
-        "humidity": humidity,
-        "wind_speed": wind_speed,
-        "pressure": pressure,
-        "precipitation": precipitation,
-    }
+tab1, tab2 = st.tabs(["Prediction", "Model evaluation"])
 
-    try:
-        response = requests.post(API_URL, params=params, timeout=10)
-        response.raise_for_status()
-        result = response.json()
+with tab1:
+    inputs = {}
 
-        prediction = result["prediction"]
-        anomaly_score = result["anomaly_score"]
+    col1, col2 = st.columns(2)
 
-        st.subheader("Prediction Result")
-        st.write(f"**Prediction:** {prediction}")
-        st.write(f"**Anomaly score:** {anomaly_score:.4f}")
+    for i, feature in enumerate(FEATURES):
+        with col1 if i % 2 == 0 else col2:
+            inputs[feature] = st.number_input(feature, value=0.0, format="%.4f")
 
-        if prediction == -1:
-            st.error("Anomalous weather conditions detected.")
-        else:
-            st.success("Normal weather conditions detected.")
+    if st.button("Predict"):
+        try:
+            response = requests.post(API_URL, json=inputs, timeout=10)
 
-    except requests.exceptions.RequestException as e:
-        st.error(f"Failed to connect to API: {e}")
+            if response.status_code == 200:
+                result = response.json()
+                preds = result.get("predictions", {})
+
+                st.success("Prediction successful")
+
+                if preds:
+                    pred_df = pd.DataFrame(
+                        {
+                            "Target": list(preds.keys()),
+                            "Predicted class": list(preds.values()),
+                        }
+                    )
+                    st.subheader("Predicted conditions")
+                    st.dataframe(pred_df, use_container_width=True)
+                else:
+                    st.warning("No predictions returned by API.")
+
+            else:
+                st.error(f"API error: {response.status_code}")
+                st.text(response.text)
+
+        except requests.exceptions.ConnectionError:
+            st.error("Could not connect to FastAPI. Make sure the API is running on port 8000.")
+        except Exception as e:
+            st.error(f"Unexpected error: {e}")
+
+with tab2:
+    st.subheader("Model evaluation metrics")
+
+    if METRICS_PATH.exists():
+        with open(METRICS_PATH, "r", encoding="utf-8") as f:
+            metrics = json.load(f)
+
+        for target, values in metrics.items():
+            st.markdown(f"### {target}")
+
+            c1, c2, c3, c4 = st.columns(4)
+            c1.metric("Accuracy", f"{values['accuracy']:.3f}")
+            c2.metric("Precision", f"{values['precision_weighted']:.3f}")
+            c3.metric("Recall", f"{values['recall_weighted']:.3f}")
+            c4.metric("F1", f"{values['f1_weighted']:.3f}")
+
+            st.write("Confusion matrix")
+            cm_df = pd.DataFrame(values["confusion_matrix"])
+            st.dataframe(cm_df, use_container_width=False)
+
+            with st.expander("Detailed classification report"):
+                report_df = pd.DataFrame(values["classification_report"]).transpose()
+                st.dataframe(report_df, use_container_width=True)
+
+            st.divider()
+    else:
+        st.warning(
+            "Metrics file not found. Run training first to generate reports/model_metrics.json."
+        )

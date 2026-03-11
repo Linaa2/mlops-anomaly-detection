@@ -30,3 +30,6 @@ mlruns/
 mlflow.db
 
 *.db
+
+# Generated reports
+reports/

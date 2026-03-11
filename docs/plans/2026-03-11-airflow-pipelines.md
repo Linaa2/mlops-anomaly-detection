@@ -1,8 +1,6 @@
 # Airflow Pipelines Implementation Plan
 
-> **For Claude:** REQUIRED SUB-SKILL: Use superpowers:executing-plans to implement this plan task-by-task.
-
-**Goal:** Implement two Airflow DAGs — `data_pipeline` (daily ingestion + preprocessing) and `training_pipeline` (weekly retraining with MLflow comparison and automatic model promotion) — with failure alerting by email.
+**Goal:** Implement two Airflow DAGs — `data_pipeline` (daily ingestion + preprocessing + random sampling) and `training_pipeline` (event-driven retraining with MLflow comparison and automatic model promotion) — with failure alerting by email.
 
 **Architecture:** Each DAG is a standalone Python file in `airflow/dags/`. Tasks call functions from `src/` directly (no SubDagOperator). Data flows through a shared Docker volume mounted at `/opt/airflow/data/`. The training DAG compares the new model's F1 score against the current Production model in MLflow Registry before promoting.
 
@@ -27,8 +25,8 @@ MLFLOW_TRACKING_URI = http://mlflow:5000
 ### DAG summary
 | DAG id | Schedule | Trigger | Key output |
 |--------|----------|---------|------------|
-| `data_pipeline` | `@daily` | time | `data/processed/features.csv` |
-| `training_pipeline` | `@weekly` | time + manual | model promoted in MLflow Registry |
+| `data_pipeline` | `@daily` | time | `hydraulic_clean.csv`, `hydraulic_sample.csv` |
+| `training_pipeline` | `None` (event-driven) | `TriggerDagRunOperator` | model promoted in MLflow Registry |
 
 ---
 
@@ -77,7 +75,7 @@ git commit -m "feat(airflow): scaffold DAG directory structure"
 
 In `tests/test_dags.py`:
 ```python
-from airflow.dags.callbacks import build_failure_callback
+from callbacks import build_failure_callback
 
 
 def test_build_failure_callback_returns_callable():
@@ -195,7 +193,7 @@ from datetime import datetime, timedelta
 from airflow import DAG
 from airflow.operators.python import PythonOperator
 
-from airflow.dags.callbacks import build_failure_callback
+from callbacks import build_failure_callback
 from src.data_ingestion import download_dataset, merge_sensors, unzip_dataset
 from src.preprocess import preprocess
 
@@ -318,7 +316,7 @@ from sklearn.preprocessing import StandardScaler
 from airflow import DAG
 from airflow.operators.python import PythonOperator
 
-from airflow.dags.callbacks import build_failure_callback
+from callbacks import build_failure_callback
 
 ALERT_EMAIL = os.getenv("ALERT_EMAIL", "team@example.com")
 MLFLOW_TRACKING_URI = os.getenv("MLFLOW_TRACKING_URI", "http://mlflow:5000")

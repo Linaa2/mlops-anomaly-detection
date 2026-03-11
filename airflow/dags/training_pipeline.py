@@ -25,9 +25,7 @@ logger = logging.getLogger(__name__)
 ALERT_EMAIL = os.getenv("ALERT_EMAIL", "team@example.com")
 MLFLOW_TRACKING_URI = os.getenv("MLFLOW_TRACKING_URI", "http://mlflow:5000")
 MODEL_NAME = "hydraulic-anomaly-detector"
-FEATURES_PATH = os.getenv("FEATURES_PATH", "data/processed/hydraulic_sample.csv")
-
-FEATURES = ["PS1", "PS2", "PS3", "TS1", "TS2", "TS3", "TS4", "VS1", "CE", "CP"]
+EXPERIMENT_NAME = "hydraulic-condition-monitoring"
 
 default_args = {
     "owner": "airflow",
@@ -37,9 +35,22 @@ default_args = {
 }
 
 
+def _compute_f1_macro(run) -> float:
+    """Compute the average of per-target F1 metrics from an MLflow run."""
+    from src.train import TARGETS
+
+    f1_values = []
+    for target in TARGETS:
+        val = run.data.metrics.get(f"f1_macro_{target}")
+        if val is not None:
+            f1_values.append(float(val))
+    return sum(f1_values) / len(f1_values) if f1_values else 0.0
+
+
 def _get_production_f1() -> float | None:
-    """Return the F1 metric of the current Production model, or None."""
+    """Return the mean F1 of the current Production model, or None if absent."""
     import mlflow
+    from mlflow.exceptions import MlflowException
     from mlflow.tracking import MlflowClient
 
     mlflow.set_tracking_uri(MLFLOW_TRACKING_URI)
@@ -48,54 +59,65 @@ def _get_production_f1() -> float | None:
         versions = client.get_latest_versions(MODEL_NAME, stages=["Production"])
         if not versions:
             return None
-        run_id = versions[0].run_id
-        run = client.get_run(run_id)
-        return float(run.data.metrics.get("f1_score", 0.0))
-    except Exception:
-        return None
+        run = client.get_run(versions[0].run_id)
+        return _compute_f1_macro(run)
+    except MlflowException as exc:
+        if "RESOURCE_DOES_NOT_EXIST" in str(exc):
+            return None
+        logger.exception("MLflow error while fetching Production F1 for %s", MODEL_NAME)
+        raise
 
 
 def train_and_log(**context) -> str:
-    """Train model, log to MLflow, register in Model Registry. Returns run_id via XCom."""
+    """Delegate training to src.train.train(), then register model in MLflow Registry.
+
+    src/train.py handles: data loading, train/test split, model fitting,
+    MLflow run creation, param/metric logging, and artifact saving.
+
+    This task adds: Model Registry registration (needed for promote/reject).
+    Returns the run_id via XCom.
+    """
     import mlflow
-    import mlflow.sklearn
-    import pandas as pd
-    from sklearn.ensemble import IsolationForest
-    from sklearn.metrics import f1_score
-    from sklearn.preprocessing import StandardScaler
+    from mlflow.tracking import MlflowClient
 
     mlflow.set_tracking_uri(MLFLOW_TRACKING_URI)
 
-    df = pd.read_csv(FEATURES_PATH)
-    X = df[FEATURES].dropna()
+    from src.train import TARGETS, train
 
-    scaler = StandardScaler()
-    X_scaled = scaler.fit_transform(X)
+    # src/train.py creates an MLflow run, logs params/metrics/artifact
+    train()
 
-    model = IsolationForest(contamination=0.05, random_state=42)
-    model.fit(X_scaled)
+    # Retrieve the run that train() just created
+    client = MlflowClient()
+    experiment = client.get_experiment_by_name(EXPERIMENT_NAME)
+    if experiment is None:
+        raise RuntimeError(f"Experiment '{EXPERIMENT_NAME}' not found after training.")
 
-    preds = model.predict(X_scaled)
-    preds_bin = [0 if p == 1 else 1 for p in preds]
-    # Placeholder labels — Personne A will replace with profile.txt labels
-    y_placeholder = [0] * len(X)
-    f1 = float(f1_score(y_placeholder, preds_bin, average="macro", zero_division=0))
-    anomaly_ratio = sum(preds_bin) / len(preds_bin)
+    runs = client.search_runs(
+        experiment_ids=[experiment.experiment_id],
+        order_by=["start_time DESC"],
+        max_results=1,
+    )
+    if not runs:
+        raise RuntimeError("No MLflow run found after training.")
 
-    with mlflow.start_run() as run:
-        mlflow.log_param("contamination", 0.05)
-        mlflow.log_param("features", FEATURES)
-        mlflow.log_param("n_samples", len(X))
-        mlflow.log_metric("f1_score", f1)
-        mlflow.log_metric("anomaly_ratio", anomaly_ratio)
-        mlflow.sklearn.log_model(
-            sk_model=model,
-            artifact_path="model",
-            registered_model_name=MODEL_NAME,
-        )
-        run_id = run.info.run_id
+    run = runs[0]
+    run_id = run.info.run_id
 
-    logger.info("Run id: %s | F1: %.4f | Anomaly ratio: %.4f", run_id, f1, anomaly_ratio)
+    # Register the model artifact in the Model Registry for promote/reject
+    model_uri = f"runs:/{run_id}/model"
+    mlflow.register_model(model_uri, MODEL_NAME)
+
+    # Log the overall f1_macro for easier comparison in promote_or_reject
+    f1_macro = _compute_f1_macro(run)
+    client.log_metric(run_id, "f1_macro", f1_macro)
+
+    logger.info(
+        "Run %s | F1 macro: %.4f | Per-target: %s",
+        run_id,
+        f1_macro,
+        {t: f"{run.data.metrics.get(f'f1_macro_{t}', 0.0):.4f}" for t in TARGETS},
+    )
     return run_id
 
 
@@ -112,7 +134,7 @@ def promote_or_reject(**context) -> None:
         raise ValueError("No run_id received from train_model task.")
 
     run = client.get_run(run_id)
-    new_f1 = float(run.data.metrics.get("f1_score", 0.0))
+    new_f1 = _compute_f1_macro(run)
 
     versions = client.get_latest_versions(MODEL_NAME, stages=["None", "Staging"])
     if not versions:
@@ -120,7 +142,7 @@ def promote_or_reject(**context) -> None:
     new_version = sorted(versions, key=lambda v: int(v.version))[-1]
 
     prod_f1 = _get_production_f1()
-    logger.info("New model F1: %.4f | Production F1: %s", new_f1, prod_f1)
+    logger.info("New model F1 macro: %.4f | Production F1 macro: %s", new_f1, prod_f1)
 
     if prod_f1 is None or new_f1 > prod_f1:
         client.transition_model_version_stage(

@@ -18,6 +18,9 @@ RUN pip install uv && uv sync --frozen --no-dev
 COPY api/ ./api/
 COPY src/ ./src/
 
+RUN useradd --create-home appuser
+USER appuser
+
 EXPOSE 8000
 
 HEALTHCHECK --interval=30s --timeout=10s --retries=3 \
