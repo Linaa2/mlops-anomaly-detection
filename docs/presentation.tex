@@ -192,26 +192,19 @@
 \begin{columns}[T]
   \begin{column}{0.52\textwidth}
     \textbf{Mod\`ele :} \texttt{MultiOutputClassifier(RF)}\\
-    {\scriptsize\color{tptgray} Pourquoi ? Un seul entra\^inement, features coh\'erentes, d\'eploiement plus simple que 4 mod\`eles}\\[4pt]
+    {\scriptsize\color{tptgray} Un seul entra\^inement, d\'eploiement plus simple que 4 mod\`eles}\\[3pt]
 
-    \textbf{R\'esultats (test set 20\%) :}\\[2pt]
-    \small
-    \begin{tabular}{@{}lccc@{}}
-      \toprule
-      \textbf{Cible} & \textbf{Acc.} & \textbf{F1\textsubscript{macro}} & \textbf{F1\textsubscript{w.}} \\
-      \midrule
-      Cooler     & 1.000 & 1.000 & 1.000 \\
-      Valve      & 0.948 & 0.947 & 0.948 \\
-      Pump       & 0.993 & 0.993 & 0.993 \\
-      Accumulator & 0.990 & 0.990 & 0.990 \\
-      \bottomrule
-    \end{tabular}
+    \textbf{MLflow --- Experiment Tracking :}\\[2pt]
+    \centering
+    \includegraphics[width=\linewidth, height=3.3cm, keepaspectratio]{mlflow.jpeg}\\[-1pt]
+    {\tiny Run MLflow --- 4 m\'etriques F1 macro, source \texttt{train.py}}
 
-    \vspace{6pt}
+    \vspace{3pt}
+    \raggedright
     \textbf{Choix de conception :}
     \begin{itemize}\scriptsize\setlength\itemsep{1pt}
       \item F1 macro pour la comparaison (g\`ere le d\'es\'equilibre)
-      \item DAG d\'el\`egue \`a \texttt{src/train.py} (s\'eparation des responsabilit\'es)
+      \item DAG d\'el\`egue \`a \texttt{src/train.py} (s\'eparation des resp.)
       \item Promotion seulement si F1\textsubscript{new} $>$ F1\textsubscript{prod}
     \end{itemize}
   \end{column}
