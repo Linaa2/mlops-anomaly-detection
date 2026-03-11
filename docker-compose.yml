@@ -14,7 +14,7 @@ x-airflow-common: &airflow-common
     AIRFLOW__API__AUTH_BACKENDS: "airflow.api.auth.backend.basic_auth"
     MLFLOW_TRACKING_URI: http://mlflow:5000
   volumes:
-    - ./dags:/opt/airflow/dags
+    - ./airflow/dags:/opt/airflow/dags
     - ./logs:/opt/airflow/logs
     - ./src:/opt/airflow/src
   depends_on:
@@ -134,6 +134,7 @@ services:
     volumes:
       - grafana_data:/var/lib/grafana
       - ./monitoring/grafana/provisioning:/etc/grafana/provisioning
+      - ./monitoring/grafana/dashboards:/etc/grafana/dashboards
     ports:
       - "3000:3000"
     depends_on:
