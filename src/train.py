@@ -3,7 +3,6 @@ from pathlib import Path
 
 import joblib
 import mlflow
-import mlflow.sklearn
 import pandas as pd
 from sklearn.ensemble import RandomForestClassifier
 from sklearn.metrics import classification_report, confusion_matrix, f1_score
@@ -64,11 +63,9 @@ def train() -> None:
             f1 = f1_score(y_test[:, i], y_pred[:, i], average="macro")
             mlflow.log_metric(f"f1_macro_{target}", f1)
 
-        mlflow.sklearn.log_model(model, artifact_path="model")
-
         Path("models").mkdir(parents=True, exist_ok=True)
         joblib.dump(model, MODEL_PATH)
-        mlflow.log_artifact(MODEL_PATH)
+        mlflow.log_artifact(MODEL_PATH, artifact_path="model")
 
     print(f"Tracking URI: {tracking_uri}")
     print(f"Model saved to: {MODEL_PATH}\n")
