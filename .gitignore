@@ -5,6 +5,8 @@ models/*.pkl
 data/
 mlruns/
 notebooks/
+context/
+.claude/
 # Env files
 envs/.env.dev
 envs/.env.prod
@@ -22,3 +24,9 @@ __pycache__/
 *.pyc
 .venv/
 k8s/secrets.yaml
+
+
+mlruns/
+mlflow.db
+
+*.db
