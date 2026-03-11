@@ -24,8 +24,26 @@ jobs:
       - name: Install dependencies
         run: uv sync --dev
 
+      - name: Run tests and generate badges
+        env:
+          MLFLOW_TRACKING_URI: ./mlruns
+        run: |
+          uv run pytest \
+            --cov=src --cov-branch --cov-fail-under=0 \
+            --cov-report=xml \
+            --junitxml=pytest-report.xml
+          uv run python scripts/generate_badges.py \
+            --coverage coverage.xml \
+            --junit pytest-report.xml \
+            --output badges
+
       - name: Build documentation
         run: uv run sphinx-build -b html docs/source docs/build/html
+
+      - name: Inject badges into docs site
+        run: |
+          mkdir -p docs/build/html/badges
+          cp badges/*.json docs/build/html/badges/
 
       - name: Upload docs artifact
         uses: actions/upload-pages-artifact@v3
