@@ -33,3 +33,4 @@ mlflow.db
 
 # Generated reports
 reports/
+docs/build/
