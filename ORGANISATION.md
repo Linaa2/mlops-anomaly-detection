@@ -123,12 +123,12 @@ Pour chaque capteur et chaque cycle → extraire :
 - [ ] DAG Airflow : extraction + preprocessing
 
 ### Personne B — Airflow & Continuous Training
-- [ ] Setup Airflow (Docker Compose)
-- [ ] DAG `data_pipeline` : ingestion + preprocessing → stockage
-- [ ] DAG `training_pipeline` : entraînement + comparaison modèles + promotion
-- [ ] Trigger CT : schedule OU dégradation performance
-- [ ] Check : nouveau modèle > ancien avant promotion Production
-- [ ] Alerting mail (bonus) : `on_failure_callback` + `on_success_callback`
+- [ ] Setup Airflow (Docker Compose) → **Personne D**
+- [x] DAG `data_pipeline` : ingestion + preprocessing + random sampling → trigger training
+- [x] DAG `training_pipeline` : entraînement + comparaison modèles + promotion
+- [x] Trigger CT : data_pipeline `@daily` déclenche training_pipeline via `TriggerDagRunOperator`
+- [x] Check : nouveau modèle > ancien avant promotion Production (promote_or_reject avec F1 comparison)
+- [x] Alerting mail : `on_failure_callback` sur tous les DAGs
 
 ### Personne C — API & WebApp
 - [ ] **Corriger `/predict`** : body JSON (Pydantic) au lieu de query params
@@ -175,11 +175,12 @@ Pour chaque capteur et chaque cycle → extraire :
 - [ ] Métriques : F1, precision, recall (si supervisé) ou anomaly ratio (si Isolation Forest)
 
 ### Phase 2 — Airflow Pipelines (objectifs 4 + 8)
-- [ ] Installer Airflow en local (via Docker Compose)
-- [ ] DAG `data_pipeline` : ingestion + preprocessing → stockage
-- [ ] DAG `training_pipeline` : entraînement + log MLflow + promotion modèle
-- [ ] Trigger CT : schedule hebdo OU dégradation performance
-- [ ] Check : nouveau modèle > ancien avant promotion en Production
+- [ ] Installer Airflow en local (via Docker Compose) → **Personne D**
+- [x] DAG `data_pipeline` : ingestion + preprocessing + random sampling (80%) → trigger training
+- [x] DAG `training_pipeline` : entraînement + log MLflow + promote/reject (F1 comparison)
+- [x] Trigger CT : `data_pipeline` @daily → `TriggerDagRunOperator` → `training_pipeline`
+- [x] Check : nouveau modèle > ancien avant promotion en Production
+- [x] Alerting mail : `on_failure_callback` sur chaque DAG
 
 ### Phase 3 — API + WebApp (objectifs 6-7)
 - [x] FastAPI structure de base
@@ -206,7 +207,7 @@ Pour chaque capteur et chaque cycle → extraire :
 
 ### Phase 6 — Bonus (si le temps le permet)
 - [ ] **Monitoring** : Prometheus scrape sur `/metrics` de FastAPI + dashboard Grafana
-- [ ] **Alerting mail** : callback Airflow `on_failure_callback` + `on_success_callback` sur réentraînement
+- [x] **Alerting mail** : callback Airflow `on_failure_callback` sur tous les DAGs
 - [ ] Rollback modèle via MLflow stages (Staging / Production / Archived)
 - [ ] Tests de charge Locust sur `/predict`
 
@@ -269,6 +270,8 @@ mlops-hydraulic-anomaly/
 - **Feature engineering** : agrégation statistique par cycle (mean/std/min/max/percentiles) — pas de deep learning sur séries brutes
 - **Stockage données** : volume Docker local (pas MinIO, trop complexe pour une journée)
 - **Labels** : utiliser les labels `profile.txt` → classification supervisée (pas d'unsupervised)
+- **Airflow schedules** : `data_pipeline` @daily avec random sampling 80% → `TriggerDagRunOperator` → `training_pipeline` (schedule=None, event-driven). Le sampling simule l'arrivée de nouvelles données sur un dataset statique, ce qui donne du sens au mécanisme promote/reject.
+- **Airflow imports** : pas de `airflow/__init__.py` (shadow le package installé). Heavy imports (mlflow, pandas, sklearn) à l'intérieur des fonctions de tâche, pas au niveau module.
 
 ---
 
