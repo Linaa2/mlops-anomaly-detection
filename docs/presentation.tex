@@ -192,37 +192,30 @@
 \begin{columns}[T]
   \begin{column}{0.52\textwidth}
     \textbf{Mod\`ele :} \texttt{MultiOutputClassifier(RF)}\\
-    {\scriptsize\color{tptgray} Pourquoi ? Un seul entra\^inement, features coh\'erentes, d\'eploiement plus simple que 4 mod\`eles}\\[4pt]
+    {\scriptsize\color{tptgray} Un seul entra\^inement, d\'eploiement plus simple que 4 mod\`eles}\\[3pt]
 
-    \textbf{R\'esultats (test set 20\%) :}\\[2pt]
-    \small
-    \begin{tabular}{@{}lccc@{}}
-      \toprule
-      \textbf{Cible} & \textbf{Acc.} & \textbf{F1\textsubscript{macro}} & \textbf{F1\textsubscript{w.}} \\
-      \midrule
-      Cooler     & 1.000 & 1.000 & 1.000 \\
-      Valve      & 0.948 & 0.947 & 0.948 \\
-      Pump       & 0.993 & 0.993 & 0.993 \\
-      Accumulator & 0.990 & 0.990 & 0.990 \\
-      \bottomrule
-    \end{tabular}
+    \textbf{MLflow --- Experiment Tracking :}\\[2pt]
+    \centering
+    \includegraphics[width=\linewidth, height=3.3cm, keepaspectratio]{mlflow.jpeg}\\[-1pt]
+    {\tiny Run MLflow --- 4 m\'etriques F1 macro, source \texttt{train.py}}
 
-    \vspace{6pt}
+    \vspace{3pt}
+    \raggedright
     \textbf{Choix de conception :}
     \begin{itemize}\scriptsize\setlength\itemsep{1pt}
       \item F1 macro pour la comparaison (g\`ere le d\'es\'equilibre)
-      \item DAG d\'el\`egue \`a \texttt{src/train.py} (s\'eparation des responsabilit\'es)
+      \item DAG d\'el\`egue \`a \texttt{src/train.py} (s\'eparation des resp.)
       \item Promotion seulement si F1\textsubscript{new} $>$ F1\textsubscript{prod}
     \end{itemize}
   \end{column}
 
   \begin{column}{0.45\textwidth}
-    \textbf{Logique CT (2 DAGs) :}\\[4pt]
+    \textbf{Logique CT (2 DAGs) :}\\[2pt]
     \footnotesize
     \begin{tikzpicture}[
-      node distance=0.4cm,
-      task/.style={draw, rounded corners=3pt, minimum width=2.8cm, minimum height=0.5cm, font=\scriptsize, fill=tptblue!8, draw=tptblue!50},
-      arr/.style={-{Stealth[length=4pt]}, tptblue!60},
+      node distance=0.2cm,
+      task/.style={draw, rounded corners=2pt, minimum width=2.5cm, minimum height=0.38cm, font=\tiny, fill=tptblue!8, draw=tptblue!50, inner sep=2pt},
+      arr/.style={-{Stealth[length=3pt]}, tptblue!60},
     ]
       \node[task] (dl) {download\_dataset};
       \node[task, below=of dl] (uz) {unzip};
@@ -235,181 +228,210 @@
       \draw[arr] (mg)--(pp); \draw[arr] (pp)--(sa);
       \draw[arr] (sa)--(tr);
 
-      \node[task, right=0.6cm of sa, fill=warnor!10, draw=warnor!50] (tm) {train\_model};
+      \node[task, right=0.5cm of sa, fill=warnor!10, draw=warnor!50] (tm) {train\_model};
       \node[task, below=of tm, fill=warnor!10, draw=warnor!50] (pr) {promote\_or\_reject};
 
-      \draw[arr, warnor!60] (tr.east) -- ++(0.2,0) |- (tm.west);
+      \draw[arr, warnor!60] (tr.east) -- ++(0.15,0) |- (tm.west);
       \draw[arr, warnor!60] (tm)--(pr);
 
-      \node[font=\scriptsize\color{tptgray}, above=0.1cm of dl] {@daily};
-      \node[font=\scriptsize\color{tptgray}, above=0.1cm of tm] {event-driven};
+      \node[font=\tiny\color{tptgray}, above=0.05cm of dl] {@daily};
+      \node[font=\tiny\color{tptgray}, above=0.05cm of tm] {event-driven};
     \end{tikzpicture}
 
-    \vspace{6pt}
-    {\scriptsize \textbf{Pourquoi \'echantillonner 80\% ?}\\
-    Dataset statique $\to$ l'\'echantillonnage simule\\la variabilit\'e, rendant la comparaison\\champion/challenger pertinente.}
+    \vspace{3pt}
+    \centering
+    \includegraphics[width=\linewidth, height=2cm, keepaspectratio]{airflow1.jpeg}\\[-1pt]
+    {\tiny Airflow UI --- graphe du data\_pipeline (6 t\^aches)}
   \end{column}
 \end{columns}
 
 \end{frame}
 
 % ═══════════════════════════════════════════════════════════════
-% SLIDE 5 — Pipeline CI/CD (45s)
-% Justifier : pourquoi double registry, pourquoi K8s conditionnel, pourquoi uv
+% SLIDE 5 — Pipeline CI (45s)
+% Justifier : qualit\'e du code, tests, outils
 % ═══════════════════════════════════════════════════════════════
-\begin{frame}[fragile]{Pipeline CI/CD}
+\begin{frame}[fragile]{Int\'egration Continue (CI)}
 
 \begin{columns}[T]
-  \begin{column}{0.48\textwidth}
-    \textbf{CI} {\small (chaque push \& PR)}\\[4pt]
+  \begin{column}{0.45\textwidth}
+    {\small\textbf{D\'eclench\'ee \`a chaque push \& PR}}\\[2pt]
     \begin{tikzpicture}[
-      node distance=0.35cm,
-      cibox/.style={draw, rounded corners=3pt, minimum width=3.5cm, minimum height=0.55cm, font=\small, fill=okgreen!8, draw=okgreen!50},
-      arr/.style={-{Stealth[length=4pt]}, okgreen!60},
+      node distance=0.15cm,
+      cibox/.style={draw, rounded corners=2pt, minimum width=2.8cm, minimum height=0.35cm, font=\scriptsize, fill=okgreen!8, draw=okgreen!50, inner sep=2pt},
+      arr/.style={-{Stealth[length=2pt]}, okgreen!60},
     ]
-      \node[cibox] (lint) {\faCheck\hspace{4pt}ruff check};
-      \node[cibox, below=of lint] (test) {\faCheck\hspace{4pt}pytest (26 tests)};
+      \node[cibox] (lint) {\faCheck\hspace{2pt}ruff check};
+      \node[cibox, below=of lint] (test) {\faCheck\hspace{2pt}pytest (26 tests)};
+      \node[cibox, below=of test] (trivy) {\faCheck\hspace{2pt}Trivy (vuln.)};
       \draw[arr] (lint)--(test);
+      \draw[arr] (test)--(trivy);
     \end{tikzpicture}
 
-    \vspace{6pt}
-    \textbf{26 tests en 3 suites :}
-    \small
-    \begin{tabular}{@{}lrp{3cm}@{}}
+    \vspace{2pt}
+    {\scriptsize\textbf{26 tests en 3 suites :}}
+    \tiny
+    \begin{tabular}{@{}lrl@{}}
       \toprule
       \textbf{Suite} & \textbf{\#} & \textbf{V\'erifie} \\
       \midrule
-      DAGs & 9 & {\scriptsize structure, task IDs, deps} \\
-      Model & 7 & {\scriptsize entra\^inement, F1, features} \\
-      Preproc. & 10 & {\scriptsize merge, filtre, NaN} \\
+      DAGs & 9 & structure, task IDs, deps \\
+      Model & 7 & entra\^inement, F1, features \\
+      Preproc. & 10 & merge, filtre, NaN \\
       \bottomrule
     \end{tabular}
+
+    \vspace{3pt}
+    \scriptsize
+    \textbf{Outils :} \texttt{uv} + \texttt{ruff} + Trivy + Dependabot\\[1pt]
+    \textbf{Workflow :} Feature branches $\to$ PR $\to$ main\\[1pt]
+    {\color{tptgray}CI gate : merge bloqu\'e si rouge. 30+ PRs.}
   \end{column}
 
-  \begin{column}{0.48\textwidth}
-    \textbf{CD} {\small (push sur main)}\\[4pt]
-    \begin{tikzpicture}[
-      node distance=0.35cm,
-      cdbox/.style={draw, rounded corners=3pt, minimum width=3.8cm, minimum height=0.55cm, font=\small, fill=tptlight!10, draw=tptlight!50},
-      arr/.style={-{Stealth[length=4pt]}, tptlight!60},
-      skipbox/.style={draw, rounded corners=3pt, minimum width=3.8cm, minimum height=0.55cm, font=\small, fill=tptgray!10, draw=tptgray!40, text=tptgray},
-    ]
-      \node[cdbox] (test) {Run tests};
-      \node[cdbox, below=of test] (build) {Build Docker images};
-      \node[cdbox, below=of build] (push) {Push GHCR + DockerHub};
-      \node[cdbox, below=of push] (check) {check-deploy (secrets?)};
-      \node[skipbox, below=of check] (deploy) {\faForward\hspace{4pt}Deploy K8s (skip)};
-      \draw[arr] (test)--(build); \draw[arr] (build)--(push);
-      \draw[arr] (push)--(check); \draw[arr, dashed, tptgray!60] (check)--(deploy);
-    \end{tikzpicture}
+  \begin{column}{0.52\textwidth}
+    \centering
+    \includegraphics[width=\linewidth, height=3.2cm, keepaspectratio]{ci.png}\\[-1pt]
+    {\tiny Pipeline CI GitHub Actions --- checks verts}
 
-    \vspace{4pt}
-    {\scriptsize \textbf{Double registry :} GHCR + DockerHub (redondance)}\\
-    {\scriptsize \textbf{Tags :} \texttt{latest} + git SHA $\to$ rollback possible}\\
-    {\scriptsize \textbf{Gestionnaire :} \texttt{uv} (rapide, lockfile, reproductible)}
+    \vspace{2pt}
+    \includegraphics[width=\linewidth, height=2.2cm, keepaspectratio]{dependabot.png}\\[-1pt]
+    {\tiny Dependabot --- mises \`a jour s\'ecurit\'e automatiques}
   \end{column}
 \end{columns}
 
 \end{frame}
 
 % ═══════════════════════════════════════════════════════════════
-% SLIDE 6 — API + WebApp + Monitoring (1m)
-% Justifier : pourquoi FastAPI, pourquoi 2 onglets, pourquoi Prometheus+Grafana
+% SLIDE 6 — API & WebApp (45s)
+% Justifier : pourquoi FastAPI, pourquoi Pydantic, pourquoi 2 onglets Streamlit
 % ═══════════════════════════════════════════════════════════════
-\begin{frame}{API, WebApp \& Monitoring}
+\begin{frame}{API \& WebApp}
 
 \begin{columns}[T]
-  \begin{column}{0.32\textwidth}
+  \begin{column}{0.48\textwidth}
     \textbf{\faServer\hspace{4pt}FastAPI}\\[4pt]
-    \small
-    \begin{itemize}\setlength\itemsep{2pt}
-      \item \texttt{POST /predict}\\{\scriptsize Validation Pydantic\\17 capteurs $\to$ 4 \'etats}
-      \item \texttt{GET /health}\\{\scriptsize Sonde K8s readiness}
-      \item \texttt{GET /metrics}\\{\scriptsize Scraping Prometheus}
-      \item \texttt{GET /docs}\\{\scriptsize Swagger auto-g\'en\'er\'e}
+    \centering
+    \includegraphics[width=\linewidth]{api.jpeg}\\[-2pt]
+    {\scriptsize Swagger UI --- 4 endpoints document\'es}
+
+    \vspace{3pt}
+    \raggedright
+    \scriptsize
+    \begin{itemize}\setlength\itemsep{1pt}
+      \item \texttt{POST /predict} --- 17 capteurs $\to$ 4 \'etats
+      \item \texttt{GET /health, /metrics, /docs}
     \end{itemize}
+    {\scriptsize\color{tptgray}\faArrowRight\hspace{4pt} Async, Pydantic, Swagger inclus}
   \end{column}
 
-  \begin{column}{0.32\textwidth}
-    \textbf{\faDesktop\hspace{4pt}Streamlit}\\[4pt]
-    \small
-    \textbf{Onglet 1 --- Pr\'ediction}
-    \begin{itemize}\setlength\itemsep{1pt}
-      \item 17 champs capteurs
-      \item Appel API $\to$ 4 \'etats
-    \end{itemize}
-    \vspace{4pt}
-    \textbf{Onglet 2 --- \'Evaluation}
-    \begin{itemize}\setlength\itemsep{1pt}
-      \item M\'etriques par cible
-      \item Matrices de confusion
-      \item Rapports de classification
-    \end{itemize}
-    {\scriptsize\color{tptgray} Via \texttt{model\_metrics.json}}
-  \end{column}
+  \begin{column}{0.48\textwidth}
+    \textbf{\faDesktop\hspace{4pt}Streamlit --- 2 onglets}\\[4pt]
+    \centering
+    \includegraphics[width=\linewidth, height=3.5cm, keepaspectratio]{webapp_final.jpeg}\\[-2pt]
+    {\scriptsize \'Evaluation du mod\`ele --- m\'etriques, matrice de confusion}
 
-  \begin{column}{0.32\textwidth}
-    \textbf{\faChartBar\hspace{4pt}Monitoring}\\[4pt]
-    \small
-    \begin{itemize}\setlength\itemsep{2pt}
-      \item \textbf{Prometheus}\\{\scriptsize Scrape \texttt{/metrics}\\+ Node Exporter}
-      \item \textbf{Grafana}\\{\scriptsize Dashboard auto-provisionn\'e\\au \texttt{compose up}}
-      \item \textbf{Alerting}\\{\scriptsize Callbacks email Airflow\\en cas d'\'echec DAG}
+    \vspace{3pt}
+    \raggedright
+    \scriptsize
+    \begin{itemize}\setlength\itemsep{1pt}
+      \item \textbf{Onglet 1 :} 17 capteurs $\to$ diagnostic 4 composants
+      \item \textbf{Onglet 2 :} M\'etriques F1, matrices de confusion
     \end{itemize}
+    {\scriptsize\color{tptgray} Source : \texttt{reports/model\_metrics.json}}
   \end{column}
 \end{columns}
-
-\vspace{6pt}
-\centering
-{\small\color{tptgray} \faArrowRight\hspace{4pt} Captures d'\'ecran dans les slides backup}
 
 \end{frame}
 
 % ═══════════════════════════════════════════════════════════════
-% SLIDE 7 — Collaboration & Le\c{c}ons apprises (45s)
-% Justifier : r\'epartition, workflow git, limites honn\^etes
+% SLIDE 7 — D\'eploiement (45s)
+% Docker Compose (dev), K8s (prod), pipeline CD
 % ═══════════════════════════════════════════════════════════════
-\begin{frame}{Collaboration \& Le\c{c}ons apprises}
+\begin{frame}[fragile]{D\'eploiement}
 
 \begin{columns}[T]
   \begin{column}{0.48\textwidth}
-    \textbf{Organisation de l'\'equipe :}\\[4pt]
+    \textbf{\faDocker\hspace{4pt}Docker Compose --- Dev / D\'emo}\\[4pt]
     \small
-    \begin{tabular}{@{}lp{5cm}@{}}
-      \toprule
-      \textbf{Qui} & \textbf{P\'erim\`etre} \\
-      \midrule
-      Lina & Donn\'ees \& pipeline ML, MLflow \\
-      Gr\'egoire & Airflow, CT, CI/CD, tests, docs \\
-      Benjamin & API FastAPI, webapp Streamlit \\
-      Mohammed & Docker, K8s, CD, monitoring \\
-      \bottomrule
-    \end{tabular}
-
-    \vspace{6pt}
-    \textbf{Workflow Git :}
-    \begin{itemize}\small
-      \item Feature branches $\to$ PR $\to$ main
-      \item CI obligatoire sur chaque PR
-      \item 20+ PRs, conventional commits
-      \item Reviews Copilot
+    \textbf{9 services} en un seul \texttt{docker compose up} :
+    \begin{itemize}\setlength\itemsep{1pt}
+      \item Airflow (scheduler + webserver + triggerer)
+      \item PostgreSQL (m\'etadonn\'ees Airflow)
+      \item MLflow Tracking Server
+      \item API FastAPI + WebApp Streamlit
+      \item Prometheus + Grafana
     \end{itemize}
+    \vspace{2pt}
+    {\scriptsize\color{tptgray}\faArrowRight\hspace{4pt} Reproductibilit\'e totale : z\'ero install manuelle}
+
+    \vspace{4pt}
+    \textbf{Images Docker optimis\'ees :}\\
+    {\scriptsize Multi-stage build, \texttt{uv} pour les deps,\\\texttt{.dockerignore} pour r\'eduire le contexte}
   \end{column}
 
   \begin{column}{0.48\textwidth}
-    \textbf{Limites assum\'ees :}
-    \begin{itemize}\small\setlength\itemsep{3pt}
-      \item Dataset statique --- CT con\c{c}u pour la prod mais valid\'e sur donn\'ees \'echantillonn\'ees
-      \item Pas de cluster K8s --- pipeline CD pr\^et, deploy skip
-      \item API charge \texttt{model.pkl} localement\\{\scriptsize (en prod : requête au MLflow Registry)}
-      \item Imports lourds dans les DAGs $\to$ diff\'er\'es dans les fonctions (limite 30s parsing)
+    \textbf{\faCloud\hspace{4pt}Kubernetes --- Production}\\[4pt]
+    \small
+    \begin{itemize}\setlength\itemsep{2pt}
+      \item Manifests K8s pr\^ets (API + WebApp)
+      \item D\'eploiement \textbf{conditionnel} :\\{\scriptsize Job \texttt{check-deploy} v\'erifie la pr\'esence\\du secret \texttt{KUBECONFIG} avant deploy}
+      \item Tags images : \texttt{latest} + git SHA\\{\scriptsize $\to$ rollback imm\'ediat possible}
     \end{itemize}
 
     \vspace{4pt}
-    \textbf{Principe cl\'e de conception :}\\
-    {\small S\'eparation des responsabilit\'es :\\
-    \texttt{src/} = logique m\'etier, \texttt{dags/} = orchestration,\\
-    \texttt{api/} = serving, \texttt{webapp/} = IHM}
+    \textbf{Pipeline CD} {\small (push sur main) :}\\[4pt]
+    \centering
+    \includegraphics[width=\linewidth]{cd.png}\\[-2pt]
+    {\scriptsize GitHub Actions CD --- build, push, check-deploy}
+
+    \vspace{2pt}
+    \raggedright
+    {\scriptsize\color{tptgray} Double registry : GHCR + DockerHub\\D\'eploy K8s conditionnel au secret \texttt{KUBECONFIG}}
+  \end{column}
+\end{columns}
+
+\end{frame}
+
+% ═══════════════════════════════════════════════════════════════
+% SLIDE 8 — Monitoring & Alerting (45s)
+% Prometheus + Grafana + Airflow callbacks
+% ═══════════════════════════════════════════════════════════════
+\begin{frame}{Monitoring \& Alerting}
+
+\begin{columns}[T]
+  \begin{column}{0.52\textwidth}
+    \textbf{\faChartBar\hspace{4pt}Dashboard Grafana}\\[4pt]
+    \centering
+    \includegraphics[width=\linewidth, height=4cm, keepaspectratio]{grafana.jpeg}\\[-1pt]
+    {\tiny MLOps Overview --- req/s, latence p95, error rate, predictions/min}
+
+    \vspace{3pt}
+    \raggedright
+    \scriptsize
+    \begin{itemize}\setlength\itemsep{1pt}
+      \item Dashboard \textbf{auto-provisionn\'e} au \texttt{compose up}
+      \item Datasource Prometheus configur\'ee automatiquement
+    \end{itemize}
+  \end{column}
+
+  \begin{column}{0.45\textwidth}
+    \textbf{\faChartLine\hspace{4pt}Prometheus}\\[3pt]
+    \scriptsize
+    \begin{itemize}\setlength\itemsep{2pt}
+      \item Scrape \texttt{/metrics} toutes les 15s
+      \item M\'etriques : requ\^etes, latence, erreurs HTTP, compteurs de pr\'edictions
+    \end{itemize}
+
+    \vspace{4pt}
+    \textbf{\faBell\hspace{4pt}Alerting}\\[3pt]
+    \scriptsize
+    \begin{itemize}\setlength\itemsep{2pt}
+      \item \textbf{Airflow callbacks} : email en cas d'\'echec DAG
+      \item \texttt{on\_failure\_callback} $\to$ email avec DAG, task, date
+      \item SMTP configurable dans \texttt{airflow.cfg}
+    \end{itemize}
+    \vspace{2pt}
+    {\scriptsize\color{tptgray}\faArrowRight\hspace{4pt} Bonus bar\`eme \#12 + \#17}
   \end{column}
 \end{columns}
 
@@ -461,12 +483,11 @@
       \bottomrule
     \end{tabular}
 
-    \vspace{8pt}
-    \textbf{Stack :}\\[2pt]
-    {\scriptsize Python 3.11 $\cdot$ scikit-learn $\cdot$ MLflow\\
-    Airflow $\cdot$ FastAPI $\cdot$ Streamlit\\
-    Docker $\cdot$ K8s $\cdot$ GitHub Actions\\
-    Prometheus $\cdot$ Grafana $\cdot$ uv}
+    \vspace{4pt}
+    \textbf{Documentation auto-g\'en\'er\'ee :}\\[2pt]
+    \centering
+    \includegraphics[width=\linewidth]{sphinx_docs.png}\\[-2pt]
+    {\scriptsize Sphinx --- doc technique g\'en\'er\'ee depuis le code}
   \end{column}
 \end{columns}
 
@@ -475,114 +496,4 @@
 % ═══════════════════════════════════════════════════════════════
 % SLIDES BACKUP — Captures d'\'ecran
 % Remplacer \screenshot par \includegraphics quand les images sont pr\^etes
-% ═══════════════════════════════════════════════════════════════
-\appendix
-
-% ── BACKUP 1 : Airflow UI ────────────────────────────────────
-\begin{frame}{Backup --- Airflow UI}
-  \begin{columns}[T]
-    \begin{column}{0.48\textwidth}
-      \centering
-      % SCREENSHOT 1 : Vue liste des DAGs Airflow
-      %   montrant les 2 DAGs (data_pipeline @daily + training_pipeline schedule=None)
-      % Remplacer par : \includegraphics[width=\linewidth]{screenshots/airflow-dags.png}
-      \screenshot{airflow-dags}{Liste des DAGs Airflow\\(data\_pipeline + training\_pipeline)}
-      {\scriptsize Vue liste des DAGs}
-    \end{column}
-    \begin{column}{0.48\textwidth}
-      \centering
-      % SCREENSHOT 2 : Graphe des t\^aches de data_pipeline
-      %   montrant les 6 t\^aches : download -> unzip -> merge -> preprocess -> sample -> trigger
-      % Remplacer par : \includegraphics[width=\linewidth]{screenshots/airflow-graph.png}
-      \screenshot{airflow-graph}{Graphe data\_pipeline\\(6 t\^aches cha\^in\'ees)}
-      {\scriptsize Vue graphe des t\^aches}
-    \end{column}
-  \end{columns}
-\end{frame}
-
-% ── BACKUP 2 : MLflow UI ─────────────────────────────────────
-\begin{frame}{Backup --- MLflow UI}
-  \begin{columns}[T]
-    \begin{column}{0.48\textwidth}
-      \centering
-      % SCREENSHOT 3 : Liste des runs MLflow
-      %   montrant l'exp\'erience "hydraulic-condition-monitoring" avec les m\'etriques F1
-      % Remplacer par : \includegraphics[width=\linewidth]{screenshots/mlflow-runs.png}
-      \screenshot{mlflow-runs}{Runs MLflow\\(m\'etriques F1 par cible)}
-      {\scriptsize Suivi des exp\'eriences}
-    \end{column}
-    \begin{column}{0.48\textwidth}
-      \centering
-      % SCREENSHOT 4 : MLflow Model Registry
-      %   montrant les versions avec les stages Production / Archived
-      % Remplacer par : \includegraphics[width=\linewidth]{screenshots/mlflow-registry.png}
-      \screenshot{mlflow-registry}{MLflow Model Registry\\(stages Production / Archived)}
-      {\scriptsize Versionnage des mod\`eles}
-    \end{column}
-  \end{columns}
-\end{frame}
-
-% ── BACKUP 3 : API & WebApp ──────────────────────────────────
-\begin{frame}{Backup --- API \& WebApp}
-  \begin{columns}[T]
-    \begin{column}{0.32\textwidth}
-      \centering
-      % SCREENSHOT 5 : Page Swagger /docs
-      %   montrant POST /predict avec le sch\'ema Pydantic (17 champs capteurs)
-      % Remplacer par : \includegraphics[width=\linewidth]{screenshots/swagger.png}
-      \screenshot{swagger}{Swagger /docs\\(sch\'ema Pydantic)}
-      {\scriptsize FastAPI}
-    \end{column}
-    \begin{column}{0.32\textwidth}
-      \centering
-      % SCREENSHOT 6 : Streamlit Onglet 1 — Pr\'ediction
-      %   montrant les 17 champs capteurs et les 4 \'etats pr\'edits
-      % Remplacer par : \includegraphics[width=\linewidth]{screenshots/streamlit-predict.png}
-      \screenshot{streamlit-predict}{Streamlit Onglet 1\\(formulaire pr\'ediction)}
-      {\scriptsize Pr\'ediction}
-    \end{column}
-    \begin{column}{0.32\textwidth}
-      \centering
-      % SCREENSHOT 7 : Streamlit Onglet 2 — \'Evaluation du mod\`ele
-      %   montrant les matrices de confusion et rapports de classification
-      % Remplacer par : \includegraphics[width=\linewidth]{screenshots/streamlit-eval.png}
-      \screenshot{streamlit-eval}{Streamlit Onglet 2\\(matrices de confusion)}
-      {\scriptsize \'Evaluation}
-    \end{column}
-  \end{columns}
-\end{frame}
-
-% ── BACKUP 4 : Monitoring & GitHub ───────────────────────────
-\begin{frame}{Backup --- Monitoring \& GitHub}
-  \begin{columns}[T]
-    \begin{column}{0.48\textwidth}
-      \centering
-      % SCREENSHOT 8 : Dashboard Grafana
-      %   montrant les m\'etriques API (taux de requ\^etes, latence, etc.)
-      % Remplacer par : \includegraphics[width=\linewidth]{screenshots/grafana.png}
-      \screenshot{grafana}{Dashboard Grafana\\(m\'etriques API + syst\`eme)}
-      {\scriptsize Monitoring}
-
-      \vspace{6pt}
-      % SCREENSHOT 9 : GitHub Actions — Pipeline CI vert
-      % Remplacer par : \includegraphics[width=\linewidth]{screenshots/github-ci.png}
-      \screenshot{github-ci}{GitHub Actions CI\\(ruff + pytest vert)}
-    \end{column}
-    \begin{column}{0.48\textwidth}
-      \centering
-      % SCREENSHOT 10 : Page des PRs GitHub
-      %   montrant les PRs merg\'ees avec les checks CI
-      % Remplacer par : \includegraphics[width=\linewidth]{screenshots/github-prs.png}
-      \screenshot{github-prs}{PRs GitHub\\(20+ merg\'ees, CI gates)}
-      {\scriptsize Collaboration}
-
-      \vspace{6pt}
-      % SCREENSHOT 11 : Pipeline CD GitHub (optionnel)
-      %   montrant le flow build -> push -> check-deploy -> deploy(skipped)
-      % Remplacer par : \includegraphics[width=\linewidth]{screenshots/github-cd.png}
-      \screenshot{github-cd}{Pipeline CD\\(build + push + check-deploy)}
-    \end{column}
-  \end{columns}
-\end{frame}
-
 \end{document}
