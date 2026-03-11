@@ -2,7 +2,7 @@
 
 **Use case :** Condition monitoring de systèmes hydrauliques — classification de l'état des composants  
 **Dataset :** [UCI Hydraulic Systems](https://archive.ics.uci.edu/ml/datasets/Condition+monitoring+of+hydraulic+systems)  
-**Groupe :** 3 personnes  
+**Groupe :** 4 personnes  
 **Livrable :** Repo GitHub + présentation PDF | Présentation 6 min + 4 min Q&A
 
 ---
@@ -115,28 +115,35 @@ Pour chaque capteur et chaque cycle → extraire :
 
 
 ### Personne A — Data & ML Pipeline
-- [ ] Setup projet GitHub (structure, README initial)
-- [ ] Script preprocessing + feature engineering (capteurs hydrauliques)
-- [ ] Choix et implémentation du modèle (V1 : classification binaire avec Random Forest)
-- [ ] Extension V2 : classification multi-output si le temps le permet
-- [ ] Intégration MLflow (tracking expériences, log métriques)
+- [ ] Intégrer `profile.txt` (labels des 4 composants)
+- [ ] Feature engineering : agréger capteurs par cycle (mean/std/min/max)
+- [ ] Filtrer les cycles instables (`stable flag = 1`)
+- [ ] Choix définitif modèle + entraînement
+- [ ] **Intégrer MLflow** : tracking expériences + model registry
 - [ ] DAG Airflow : extraction + preprocessing
-- [ ] DAG Airflow : entraînement + CT (Continuous Training)
 
-### Personne B — API & WebApp
-- [ ] FastAPI : endpoint `/predict`, `/health`, `/metrics`
-- [ ] Swagger / OpenAPI bien documenté
-- [ ] Streamlit : UI pour soumettre des données et voir les prédictions
+### Personne B — Airflow & Continuous Training
+- [ ] Setup Airflow (Docker Compose)
+- [ ] DAG `data_pipeline` : ingestion + preprocessing → stockage
+- [ ] DAG `training_pipeline` : entraînement + comparaison modèles + promotion
+- [ ] Trigger CT : schedule OU dégradation performance
+- [ ] Check : nouveau modèle > ancien avant promotion Production
+- [ ] Alerting mail (bonus) : `on_failure_callback` + `on_success_callback`
+
+### Personne C — API & WebApp
+- [ ] **Corriger `/predict`** : body JSON (Pydantic) au lieu de query params
+- [ ] Endpoint `/metrics` (Prometheus format)
+- [ ] Charger modèle depuis MLflow Registry (pas fichier local)
+- [ ] **Réécrire `webapp/app.py`** : champs capteurs hydrauliques + état des 4 composants
 - [ ] Dockerisation API + WebApp
-- [ ] Tests unitaires + tests d'intégration API
+- [ ] Tests unitaires + intégration API
 
-### Personne C — Infra & DevOps
-- [ ] Docker Compose (dev) : Airflow, MLflow, FastAPI, Streamlit
-- [ ] Kubernetes manifests (prod) : déploiement FastAPI + Streamlit
-- [ ] Helm Charts pour les services (Airflow, MLflow)
-- [ ] GitHub Actions CI/CD : lint, tests, build image, push DockerHub, deploy K8s
+### Personne D — Infra & DevOps
+- [ ] `docker-compose.yml` : Airflow + MLflow + FastAPI + Streamlit
+- [ ] Manifests K8s : `api-deployment.yaml`, `webapp-deployment.yaml`
+- [ ] GitHub Actions `cd.yml` : build → push DockerHub → deploy K8s
+- [ ] Séparation env `dev` (Docker Compose) vs `prod` (K8s)
 - [ ] Monitoring Prometheus + Grafana (bonus)
-- [ ] Alerting mail (bonus)
 
 ---
 
