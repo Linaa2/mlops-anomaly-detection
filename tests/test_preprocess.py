@@ -12,16 +12,22 @@ sys.path.insert(0, PROJECT_ROOT)
 
 import src.preprocess as preprocess_module
 
-# Compatible avec les deux versions du module
 FEATURES = getattr(preprocess_module, "FEATURES", None) or getattr(preprocess_module, "SENSORS", None)
+HAS_STABLE_FLAG = hasattr(preprocess_module, "TARGETS")
 
 
 def _make_df(n=50, with_nan=False):
     rng = np.random.RandomState(0)
-    df = pd.DataFrame({f: rng.rand(n) for f in FEATURES})
+    data = {f: rng.rand(n) for f in FEATURES}
+    if HAS_STABLE_FLAG:
+        data["stable_flag"] = [0] * n
+        data["cooler_condition"] = rng.choice([3, 20, 100], n)
+        data["valve_condition"] = rng.choice([73, 80, 90, 100], n)
+        data["pump_leakage"] = rng.choice([0, 1, 2], n)
+        data["accumulator_pressure"] = rng.choice([90, 100, 115, 130], n)
     if with_nan:
-        df.loc[:4, FEATURES[0]] = np.nan
-    return df
+        data[FEATURES[0]] = [np.nan] * 5 + list(rng.rand(n - 5))
+    return pd.DataFrame(data)
 
 
 def test_features_count():
