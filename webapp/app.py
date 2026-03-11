@@ -137,7 +137,9 @@ def render_prediction_result(preds: dict) -> None:
                     <div style="font-size: 2.5rem">{icon}</div>
                     <div style="font-weight: bold; font-size: 1rem; margin: 0.4rem 0">{name}</div>
                     <div style="font-size: 0.85rem; color: #ccc">{label}</div>
-                    <div style="font-size: 0.75rem; color: #888; margin-top: 0.3rem">classe {raw_value}</div>
+                    <div style="font-size: 0.75rem; color: #888; margin-top: 0.3rem">
+                        classe {raw_value}
+                    </div>
                 </div>
                 """,
                 unsafe_allow_html=True,
