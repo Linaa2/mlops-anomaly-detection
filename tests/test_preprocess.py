@@ -1,0 +1,79 @@
+"""Tests for src/preprocess.py."""
+
+import os
+import sys
+from pathlib import Path
+from unittest.mock import patch
+
+import numpy as np
+import pandas as pd
+
+PROJECT_ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+sys.path.insert(0, PROJECT_ROOT)
+
+from src.preprocess import FEATURES
+
+
+def _make_df(n=50, with_nan=False):
+    rng = np.random.RandomState(0)
+    df = pd.DataFrame({f: rng.rand(n) for f in FEATURES})
+    if with_nan:
+        df.loc[:4, "PS1"] = np.nan
+    return df
+
+
+def test_features_count():
+    assert len(FEATURES) == 10
+
+
+def test_preprocess_creates_output(tmp_path):
+    df = _make_df()
+    output = tmp_path / "clean.csv"
+    with (
+        patch("pandas.read_csv", return_value=df),
+        patch("src.preprocess.OUTPUT_PATH", str(output)),
+    ):
+        from src.preprocess import preprocess
+        preprocess()
+    assert output.exists()
+
+
+def test_preprocess_drops_nan(tmp_path):
+    df = _make_df(with_nan=True)
+    output = tmp_path / "clean.csv"
+    with (
+        patch("pandas.read_csv", return_value=df),
+        patch("src.preprocess.OUTPUT_PATH", str(output)),
+    ):
+        from src.preprocess import preprocess
+        preprocess()
+    result = pd.read_csv(output)
+    assert not result.isnull().any().any()
+    assert len(result) == 45
+
+
+def test_preprocess_keeps_only_features(tmp_path):
+    df = _make_df()
+    df["extra_col"] = 999
+    output = tmp_path / "clean.csv"
+    with (
+        patch("pandas.read_csv", return_value=df),
+        patch("src.preprocess.OUTPUT_PATH", str(output)),
+    ):
+        from src.preprocess import preprocess
+        preprocess()
+    result = pd.read_csv(output)
+    assert list(result.columns) == FEATURES
+
+
+def test_preprocess_output_has_correct_rows(tmp_path):
+    df = _make_df(n=100)
+    output = tmp_path / "clean.csv"
+    with (
+        patch("pandas.read_csv", return_value=df),
+        patch("src.preprocess.OUTPUT_PATH", str(output)),
+    ):
+        from src.preprocess import preprocess
+        preprocess()
+    result = pd.read_csv(output)
+    assert len(result) == 100
