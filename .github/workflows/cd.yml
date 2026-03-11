@@ -1,7 +1,3 @@
-# ============================================================
-# CD Pipeline — Build → Push DockerHub → Deploy K8s
-# Trigger : push sur main
-# ============================================================
 name: CD Pipeline
 
 on:
@@ -16,7 +12,6 @@ env:
 
 jobs:
 
-  # ── 1. Tests avant build ───────────────────────────────────
   test:
     name: Run Tests
     runs-on: ubuntu-latest
@@ -37,7 +32,6 @@ jobs:
       - name: Run tests
         run: uv run pytest tests/ -v --tb=short
 
-  # ── 2. Build & Push Docker images ─────────────────────────
   build-push:
     name: Build & Push to DockerHub
     runs-on: ubuntu-latest
@@ -85,54 +79,5 @@ jobs:
           cache-from: type=gha
           cache-to: type=gha,mode=max
 
-  # ── 3. Deploy sur K8s ─────────────────────────────────────
-  deploy:
-    name: Deploy to Kubernetes
-    runs-on: ubuntu-latest
-    needs: build-push
-    environment: production
-    steps:
-      - name: Checkout code
-        uses: actions/checkout@v4
-
-      - name: Set up kubectl
-        uses: azure/setup-kubectl@v3
-        with:
-          version: "v1.29.0"
-
-      - name: Configure kubeconfig
-        run: |
-          mkdir -p $HOME/.kube
-          echo "${{ secrets.KUBECONFIG }}" | base64 -d > $HOME/.kube/config
-
-      - name: Create namespace if not exists
-        run: kubectl get namespace mlops || kubectl create namespace mlops
-
-      - name: Create/Update secrets
-        run: |
-          kubectl create secret generic mlops-secrets \
-            --from-literal=MLFLOW_TRACKING_URI=${{ secrets.MLFLOW_TRACKING_URI }} \
-            --namespace mlops \
-            --dry-run=client -o yaml | kubectl apply -f -
-
-      - name: Update image tags
-        run: |
-          sed -i "s|mlops-api:latest|mlops-api:${{ needs.build-push.outputs.image_tag }}|g" k8s/api-deployment.yaml
-          sed -i "s|mlops-webapp:latest|mlops-webapp:${{ needs.build-push.outputs.image_tag }}|g" k8s/webapp-deployment.yaml
-          sed -i "s|\$DOCKERHUB_USERNAME|${{ secrets.DOCKERHUB_USERNAME }}|g" k8s/api-deployment.yaml
-          sed -i "s|\$DOCKERHUB_USERNAME|${{ secrets.DOCKERHUB_USERNAME }}|g" k8s/webapp-deployment.yaml
-
-      - name: Deploy to K8s
-        run: |
-          kubectl apply -f k8s/api-deployment.yaml
-          kubectl apply -f k8s/webapp-deployment.yaml
-
-      - name: Wait for rollout
-        run: |
-          kubectl rollout status deployment/api -n mlops --timeout=120s
-          kubectl rollout status deployment/webapp -n mlops --timeout=120s
-
-      - name: Verify deployment
-        run: |
-          kubectl get pods -n mlops
-          kubectl get services -n mlops
+  # deploy: désactivé — cluster K8s non configuré
+  # À activer quand KUBECONFIG sera dans les secrets GitHub
