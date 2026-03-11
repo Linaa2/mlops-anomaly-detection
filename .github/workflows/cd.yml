@@ -102,12 +102,30 @@ jobs:
           cache-from: type=gha
           cache-to: type=gha,mode=max
 
-  # ── 3. Deploy sur K8s ─────────────────────────────────────
+  # ── 3. Check secrets disponibles ──────────────────────────
+  check-deploy:
+    name: Check deploy secrets
+    runs-on: ubuntu-latest
+    needs: build-push
+    outputs:
+      has_kubeconfig: ${{ steps.check.outputs.has_kubeconfig }}
+    steps:
+      - id: check
+        run: |
+          if [ -n "$SECRET" ]; then
+            echo "has_kubeconfig=true" >> $GITHUB_OUTPUT
+          else
+            echo "has_kubeconfig=false" >> $GITHUB_OUTPUT
+          fi
+        env:
+          SECRET: ${{ secrets.KUBECONFIG }}
+
+  # ── 4. Deploy sur K8s ─────────────────────────────────────
   deploy:
     name: Deploy to Kubernetes
     runs-on: ubuntu-latest
-    needs: build-push
-    if: ${{ secrets.KUBECONFIG != '' }}
+    needs: [build-push, check-deploy]
+    if: needs.check-deploy.outputs.has_kubeconfig == 'true'
     environment: production
     steps:
       - name: Checkout code
