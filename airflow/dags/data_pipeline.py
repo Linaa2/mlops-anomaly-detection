@@ -35,7 +35,7 @@ with DAG(
     dag_id="data_pipeline",
     default_args=default_args,
     description="Download, extract and preprocess hydraulic sensor data",
-    schedule="@daily",
+    schedule="@once",
     start_date=datetime(2024, 1, 1),
     catchup=False,
     tags=["data", "ingestion"],
