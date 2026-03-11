@@ -10,8 +10,6 @@ on:
   workflow_dispatch:
 
 env:
-  GHCR_IMAGE_API: ghcr.io/${{ github.repository_owner }}/mlops-api
-  GHCR_IMAGE_WEBAPP: ghcr.io/${{ github.repository_owner }}/mlops-webapp
   DH_IMAGE_API: ${{ secrets.DOCKERHUB_USERNAME }}/mlops-api
   DH_IMAGE_WEBAPP: ${{ secrets.DOCKERHUB_USERNAME }}/mlops-webapp
 
@@ -70,9 +68,11 @@ jobs:
           username: ${{ secrets.DOCKERHUB_USERNAME }}
           password: ${{ secrets.DOCKERHUB_TOKEN }}
 
-      - name: Extract image tag (short SHA)
+      - name: Extract image tag and lowercase owner
         id: meta
-        run: echo "version=$(git rev-parse --short HEAD)" >> $GITHUB_OUTPUT
+        run: |
+          echo "version=$(git rev-parse --short HEAD)" >> $GITHUB_OUTPUT
+          echo "owner=$(echo '${{ github.repository_owner }}' | tr '[:upper:]' '[:lower:]')" >> $GITHUB_OUTPUT
 
       - name: Build & Push API image
         uses: docker/build-push-action@v5
@@ -81,8 +81,8 @@ jobs:
           file: api/Dockerfile
           push: true
           tags: |
-            ${{ env.GHCR_IMAGE_API }}:latest
-            ${{ env.GHCR_IMAGE_API }}:${{ steps.meta.outputs.version }}
+            ghcr.io/${{ steps.meta.outputs.owner }}/mlops-api:latest
+            ghcr.io/${{ steps.meta.outputs.owner }}/mlops-api:${{ steps.meta.outputs.version }}
             ${{ env.DH_IMAGE_API }}:latest
             ${{ env.DH_IMAGE_API }}:${{ steps.meta.outputs.version }}
           cache-from: type=gha
@@ -95,8 +95,8 @@ jobs:
           file: webapp/Dockerfile
           push: true
           tags: |
-            ${{ env.GHCR_IMAGE_WEBAPP }}:latest
-            ${{ env.GHCR_IMAGE_WEBAPP }}:${{ steps.meta.outputs.version }}
+            ghcr.io/${{ steps.meta.outputs.owner }}/mlops-webapp:latest
+            ghcr.io/${{ steps.meta.outputs.owner }}/mlops-webapp:${{ steps.meta.outputs.version }}
             ${{ env.DH_IMAGE_WEBAPP }}:latest
             ${{ env.DH_IMAGE_WEBAPP }}:${{ steps.meta.outputs.version }}
           cache-from: type=gha
@@ -153,8 +153,9 @@ jobs:
 
       - name: Update image tags in manifests
         run: |
-          sed -i "s|IMAGE_API|${{ env.GHCR_IMAGE_API }}:${{ needs.build-push.outputs.image_tag }}|g" k8s/api-deployment.yaml
-          sed -i "s|IMAGE_WEBAPP|${{ env.GHCR_IMAGE_WEBAPP }}:${{ needs.build-push.outputs.image_tag }}|g" k8s/webapp-deployment.yaml
+          OWNER=$(echo '${{ github.repository_owner }}' | tr '[:upper:]' '[:lower:]')
+          sed -i "s|IMAGE_API|ghcr.io/${OWNER}/mlops-api:${{ needs.build-push.outputs.image_tag }}|g" k8s/api-deployment.yaml
+          sed -i "s|IMAGE_WEBAPP|ghcr.io/${OWNER}/mlops-webapp:${{ needs.build-push.outputs.image_tag }}|g" k8s/webapp-deployment.yaml
 
       - name: Deploy to K8s
         run: |
