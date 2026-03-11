@@ -1,0 +1,161 @@
+version: "3.9"
+
+# ============================================================
+# DEV ENVIRONMENT — Docker Compose
+# Services : Airflow, MLflow, FastAPI, Streamlit, Monitoring
+# ============================================================
+
+x-airflow-common: &airflow-common
+  image: apache/airflow:2.9.1
+  environment: &airflow-common-env
+    AIRFLOW__CORE__EXECUTOR: LocalExecutor
+    AIRFLOW__DATABASE__SQL_ALCHEMY_CONN: postgresql+psycopg2://airflow:airflow@postgres/airflow
+    AIRFLOW__CORE__FERNET_KEY: ""
+    AIRFLOW__CORE__DAGS_ARE_PAUSED_AT_CREATION: "true"
+    AIRFLOW__CORE__LOAD_EXAMPLES: "false"
+    AIRFLOW__API__AUTH_BACKENDS: "airflow.api.auth.backend.basic_auth"
+    MLFLOW_TRACKING_URI: http://mlflow:5000
+  volumes:
+    - ./dags:/opt/airflow/dags
+    - ./logs:/opt/airflow/logs
+    - ./src:/opt/airflow/src
+  depends_on:
+    postgres:
+      condition: service_healthy
+
+services:
+
+  # ── PostgreSQL (Airflow backend + MLflow backend) ──────────
+  postgres:
+    image: postgres:15
+    environment:
+      POSTGRES_USER: airflow
+      POSTGRES_PASSWORD: airflow
+      POSTGRES_DB: airflow
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+      - ./scripts/init_mlflow_db.sql:/docker-entrypoint-initdb.d/init_mlflow_db.sql
+    healthcheck:
+      test: ["CMD", "pg_isready", "-U", "airflow"]
+      interval: 10s
+      retries: 5
+    ports:
+      - "5432:5432"
+
+  # ── MLflow Tracking Server ─────────────────────────────────
+  mlflow:
+    image: ghcr.io/mlflow/mlflow:v2.13.0
+    command: >
+      mlflow server
+      --backend-store-uri postgresql+psycopg2://airflow:airflow@postgres/mlflow
+      --default-artifact-root /mlflow/artifacts
+      --host 0.0.0.0
+      --port 5000
+    volumes:
+      - mlflow_artifacts:/mlflow/artifacts
+    ports:
+      - "5000:5000"
+    depends_on:
+      postgres:
+        condition: service_healthy
+
+  # ── Airflow Init ───────────────────────────────────────────
+  airflow-init:
+    <<: *airflow-common
+    command: >
+      bash -c "airflow db migrate &&
+               airflow users create
+               --username admin --password admin
+               --firstname Admin --lastname Admin
+               --role Admin --email admin@example.com"
+    restart: on-failure
+
+  # ── Airflow Webserver ──────────────────────────────────────
+  airflow-webserver:
+    <<: *airflow-common
+    command: webserver
+    ports:
+      - "8080:8080"
+    healthcheck:
+      test: ["CMD", "curl", "--fail", "http://localhost:8080/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 5
+    restart: always
+
+  # ── Airflow Scheduler ──────────────────────────────────────
+  airflow-scheduler:
+    <<: *airflow-common
+    command: scheduler
+    restart: always
+
+  # ── FastAPI ────────────────────────────────────────────────
+  api:
+    build:
+      context: .
+      dockerfile: api/Dockerfile
+    environment:
+      MLFLOW_TRACKING_URI: http://mlflow:5000
+      ENV: dev
+    volumes:
+      - ./api:/app/api
+      - ./src:/app/src
+    ports:
+      - "8000:8000"
+    depends_on:
+      - mlflow
+    restart: always
+
+  # ── Streamlit ──────────────────────────────────────────────
+  webapp:
+    build:
+      context: .
+      dockerfile: webapp/Dockerfile
+    environment:
+      API_URL: http://api:8000
+      ENV: dev
+    volumes:
+      - ./webapp:/app/webapp
+    ports:
+      - "8501:8501"
+    depends_on:
+      - api
+    restart: always
+
+  # ── Prometheus ─────────────────────────────────────────────
+  prometheus:
+    image: prom/prometheus:v2.51.0
+    volumes:
+      - ./monitoring/prometheus.yml:/etc/prometheus/prometheus.yml
+    ports:
+      - "9090:9090"
+    restart: always
+
+  # ── Grafana ────────────────────────────────────────────────
+  grafana:
+    image: grafana/grafana:10.4.2
+    environment:
+      GF_SECURITY_ADMIN_PASSWORD: admin
+    volumes:
+      - grafana_data:/var/lib/grafana
+      - ./monitoring/grafana/provisioning:/etc/grafana/provisioning
+    ports:
+      - "3000:3000"
+    depends_on:
+      - prometheus
+    restart: always
+
+volumes:
+  postgres_data:
+  mlflow_artifacts:
+  grafana_data:
+
+# ── Chargement automatique env dev ────────────────────────
+# Lancer avec : docker compose --env-file envs/.env.dev up
+
+  # ── Node Exporter (system metrics) ────────────────────────
+  node-exporter:
+    image: prom/node-exporter:v1.7.0
+    ports:
+      - "9100:9100"
+    restart: always

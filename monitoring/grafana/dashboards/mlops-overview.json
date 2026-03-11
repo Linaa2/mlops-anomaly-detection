@@ -1,0 +1,93 @@
+{
+  "title": "MLOps Overview",
+  "uid": "mlops-overview",
+  "version": 1,
+  "schemaVersion": 36,
+  "refresh": "10s",
+  "panels": [
+    {
+      "id": 1,
+      "title": "API — Requests per second",
+      "type": "timeseries",
+      "gridPos": { "x": 0, "y": 0, "w": 12, "h": 8 },
+      "targets": [
+        {
+          "expr": "rate(http_requests_total{job=\"fastapi\"}[1m])",
+          "legendFormat": "{{method}} {{endpoint}}"
+        }
+      ]
+    },
+    {
+      "id": 2,
+      "title": "API — Latency p95 (ms)",
+      "type": "timeseries",
+      "gridPos": { "x": 12, "y": 0, "w": 12, "h": 8 },
+      "targets": [
+        {
+          "expr": "histogram_quantile(0.95, rate(http_request_duration_seconds_bucket{job=\"fastapi\"}[5m])) * 1000",
+          "legendFormat": "p95 latency"
+        }
+      ]
+    },
+    {
+      "id": 3,
+      "title": "API — Error rate (%)",
+      "type": "stat",
+      "gridPos": { "x": 0, "y": 8, "w": 6, "h": 4 },
+      "targets": [
+        {
+          "expr": "rate(http_requests_total{job=\"fastapi\", status=~\"5..\"}[5m]) / rate(http_requests_total{job=\"fastapi\"}[5m]) * 100",
+          "legendFormat": "Error %"
+        }
+      ]
+    },
+    {
+      "id": 4,
+      "title": "Anomaly Detection — Predictions/min",
+      "type": "timeseries",
+      "gridPos": { "x": 6, "y": 8, "w": 18, "h": 4 },
+      "targets": [
+        {
+          "expr": "rate(model_predictions_total[1m])",
+          "legendFormat": "predictions/min"
+        }
+      ]
+    },
+    {
+      "id": 5,
+      "title": "Anomaly Score — Distribution",
+      "type": "histogram",
+      "gridPos": { "x": 0, "y": 12, "w": 12, "h": 8 },
+      "targets": [
+        {
+          "expr": "model_anomaly_score_bucket",
+          "legendFormat": "score"
+        }
+      ]
+    },
+    {
+      "id": 6,
+      "title": "Airflow — DAG success rate",
+      "type": "stat",
+      "gridPos": { "x": 12, "y": 12, "w": 6, "h": 8 },
+      "targets": [
+        {
+          "expr": "airflow_dag_success_total / (airflow_dag_success_total + airflow_dag_failed_total) * 100",
+          "legendFormat": "success %"
+        }
+      ]
+    },
+    {
+      "id": 7,
+      "title": "MLflow — Active runs",
+      "type": "stat",
+      "gridPos": { "x": 18, "y": 12, "w": 6, "h": 8 },
+      "targets": [
+        {
+          "expr": "mlflow_active_runs",
+          "legendFormat": "active runs"
+        }
+      ]
+    }
+  ]
+}
