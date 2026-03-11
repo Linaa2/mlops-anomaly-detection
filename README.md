@@ -1,190 +1,271 @@
-# Hydraulic System Condition Monitoring — MLOps Pipeline
+<h1 align="center">Hydraulic System Condition Monitoring</h1>
 
-Multi-output classification of hydraulic system component health using sensor data, with full MLOps infrastructure: Airflow orchestration, MLflow tracking, FastAPI serving, Streamlit UI, and Prometheus/Grafana monitoring.
+<p align="center"><strong>Détection de pannes multi-composants sur systèmes hydrauliques par classification supervisée</strong></p>
 
-## Dataset
+<p align="center">
+  <a href="https://github.com/Linaa2/mlops-anomaly-detection/actions/workflows/ci.yaml">
+    <img src="https://github.com/Linaa2/mlops-anomaly-detection/actions/workflows/ci.yaml/badge.svg?branch=main" alt="CI Pipeline">
+  </a>
+  <a href="https://github.com/Linaa2/mlops-anomaly-detection/pkgs/container/mlops-anomaly-detection">
+    <img src="https://img.shields.io/badge/Docker-GHCR.io-0db7ed?logo=docker&logoColor=white" alt="Images Docker">
+  </a>
+  <a href="https://linaa2.github.io/mlops-anomaly-detection/">
+    <img src="https://img.shields.io/badge/Docs-GitHub%20Pages-327FC7?logo=github" alt="Documentation GitHub Pages">
+  </a>
+  <img src="https://img.shields.io/badge/Python-3.11-3776AB?logo=python&logoColor=white" alt="Python 3.11">
+  <img src="https://img.shields.io/badge/MLflow-tracking-0194E2?logo=mlflow&logoColor=white" alt="MLflow">
+</p>
+
+---
+
+## 📊 Aperçu
+
+- Pipeline MLOps complet pour la **surveillance de l'état de composants hydrauliques** à partir de données capteurs (UCI dataset — 2205 cycles × 17 capteurs).
+- Modèle `MultiOutputClassifier(RandomForestClassifier)` classifiant simultanément l'état de 4 composants (refroidisseur, valve, pompe, accumulateur).
+- Infrastructure complète : orchestration Airflow, tracking MLflow, API FastAPI, interface Streamlit, monitoring Prometheus/Grafana, CI/CD GitHub Actions.
+
+---
+
+## 🔬 Dataset
 
 **[UCI Condition Monitoring of Hydraulic Systems](https://archive.ics.uci.edu/ml/datasets/Condition+monitoring+of+hydraulic+systems)**
 
-- 2205 cycles x 17 sensors (pressure, temperature, vibration, flow, efficiency)
-- Labels from `profile.txt`: condition of 4 components per cycle
-- Unstable cycles filtered out (`stable_flag == 0`)
+- 2205 cycles × 17 capteurs (pression, température, vibration, débit, efficacité)
+- Labels issus de `profile.txt` : état de 4 composants par cycle
+- Cycles instables filtrés (`stable_flag == 0`)
 
-| Target | Component | Classes |
+| Target | Composant | Classes |
 |--------|-----------|---------|
-| `cooler_condition` | Cooler | 3 (failure), 20 (reduced), 100 (ok) |
-| `valve_condition` | Valve | 73 (failure), 80 (severe lag), 90 (slight lag), 100 (ok) |
-| `pump_leakage` | Pump | 0 (none), 1 (weak), 2 (severe) |
-| `accumulator_pressure` | Accumulator | 90 (failure), 100 (severe), 115 (reduced), 130 (ok) |
+| `cooler_condition` | Refroidisseur | 3 (panne), 20 (réduit), 100 (ok) |
+| `valve_condition` | Valve | 73 (panne), 80 (lag sévère), 90 (lag léger), 100 (ok) |
+| `pump_leakage` | Pompe | 0 (aucune), 1 (faible), 2 (sévère) |
+| `accumulator_pressure` | Accumulateur | 90 (panne), 100 (sévère), 115 (réduit), 130 (ok) |
 
-## Model
+---
+
+## 🤖 Modèle
 
 `MultiOutputClassifier(RandomForestClassifier(n_estimators=100))`
 
-- **17 features**: PS1-PS6, EPS1, FS1-FS2, TS1-TS4, VS1, CE, CP, SE (mean per cycle)
-- **4 targets**: multi-class classification per component
-- **Metrics**: F1 macro, accuracy, precision, recall per target
-- **Tracking**: MLflow (params, metrics, model artifact, JSON report)
+- **17 features** : PS1–PS6, EPS1, FS1–FS2, TS1–TS4, VS1, CE, CP, SE (moyenne par cycle)
+- **4 targets** : classification multi-classe par composant
+- **Métriques** : F1 macro, accuracy, precision, recall par target
+- **Tracking** : MLflow (params, métriques, artefacts modèle, rapport JSON)
 
-**Results (test set 20%):**
+**Résultats (test set 20%) :**
 
 | Target | Accuracy | F1 macro | F1 weighted |
 |--------|----------|----------|-------------|
-| cooler_condition | 1.000 | 1.000 | 1.000 |
-| valve_condition | 0.948 | 0.947 | 0.948 |
-| pump_leakage | 0.993 | 0.993 | 0.993 |
-| accumulator_pressure | 0.990 | 0.990 | 0.990 |
+| `cooler_condition` | 1.000 | 1.000 | 1.000 |
+| `valve_condition` | 0.948 | 0.947 | 0.948 |
+| `pump_leakage` | 0.993 | 0.993 | 0.993 |
+| `accumulator_pressure` | 0.990 | 0.990 | 0.990 |
 
-## Architecture
+---
+
+## 🏗️ Architecture
 
 ```
 [UCI Dataset]
-    |  DAG: data_pipeline (@daily)
-[Download -> Unzip -> Merge -> Preprocess -> Sample 80% -> Trigger training]
-    |  DAG: training_pipeline (event-driven)
-[Train via src/train.py -> Register in MLflow -> Promote/Reject (F1 comparison)]
-    |
-[FastAPI] <- model served from models/model.pkl
-    |
-[Streamlit WebApp] -> FastAPI -> predictions -> UI
-    |
-[Prometheus + Grafana] -> API metrics (/metrics) + system metrics (node-exporter)
+    │  DAG: data_pipeline (@daily)
+[Download → Unzip → Merge → Preprocess → Sample 80% → Trigger training]
+    │  DAG: training_pipeline (event-driven)
+[Train via src/train.py → Register in MLflow → Promote/Reject (F1 comparison)]
+    │
+[FastAPI] ← model served from models/model.pkl
+    │
+[Streamlit WebApp] → FastAPI → predictions → UI
+    │
+[Prometheus + Grafana] → API metrics (/metrics) + system metrics (node-exporter)
 ```
 
-## Services (Docker Compose)
+## 🐳 Services (Docker Compose)
 
-| Service | Port | Role |
+| Service | Port | Rôle |
 |---------|------|------|
-| Airflow (webserver + scheduler + init) | 8080 | Pipeline orchestration (admin/admin) |
+| Airflow (webserver + scheduler + init) | 8080 | Orchestration (admin/admin) |
 | MLflow | 5000 | Experiment tracking & model registry |
-| FastAPI | 8000 | Prediction API (`/predict`, `/health`, `/metrics`) |
-| Streamlit | 8501 | User interface (2 tabs: prediction + model evaluation) |
-| Prometheus | 9090 | Metrics collection (scrapes API + node-exporter) |
-| Grafana | 3000 | Dashboards, auto-provisioned (admin/admin) |
-| PostgreSQL | 5432 | Airflow metadata backend |
-| Node Exporter | 9100 | System metrics for Prometheus |
+| FastAPI | 8000 | API de prédiction (`/predict`, `/health`, `/metrics`) |
+| Streamlit | 8501 | Interface utilisateur (prédiction + évaluation) |
+| Prometheus | 9090 | Collecte de métriques |
+| Grafana | 3000 | Dashboards auto-provisionnés (admin/admin) |
+| PostgreSQL | 5432 | Backend metadata Airflow |
+| Node Exporter | 9100 | Métriques système |
 
-## Quick Start
+---
+
+## 🚀 Démarrage rapide
 
 ```bash
-# Clone and install
+# Cloner et installer
 git clone git@github.com:Linaa2/mlops-anomaly-detection.git
 cd mlops-anomaly-detection
 pip install uv && uv sync
 
-# Run tests (26 tests)
+# Tests
 uv run pytest tests/ -v
 
-# Lint
+# Linting
 uv run ruff check .
 
-# Launch dev environment (all 9 services)
+# Lancer l'environnement dev (tous les services)
 docker compose up --build
 
-# Stop
+# Arrêter
 docker compose down
 ```
 
-## Project Structure
-
-```
-mlops-anomaly-detection/
-├── .github/workflows/
-│   ├── ci.yaml                    # CI: pytest + ruff on push/PR
-│   └── cd.yml                     # CD: test -> build GHCR+DockerHub -> deploy K8s
-├── airflow/dags/
-│   ├── callbacks.py               # Email failure alerting (bonus)
-│   ├── data_pipeline.py           # DAG: ingestion + preprocessing + sampling
-│   └── training_pipeline.py       # DAG: train + MLflow register + promote/reject
-├── api/
-│   ├── Dockerfile
-│   └── app.py                     # FastAPI prediction service + Prometheus /metrics
-├── webapp/
-│   ├── Dockerfile
-│   └── app.py                     # Streamlit UI (prediction + model evaluation)
-├── src/
-│   ├── data_ingestion.py          # Download UCI + unzip + merge sensors
-│   ├── preprocess.py              # Filter, clean, select features+targets
-│   └── train.py                   # MultiOutput RF training + MLflow tracking + JSON export
-├── k8s/
-│   ├── api-deployment.yaml        # K8s deployment + service
-│   └── webapp-deployment.yaml     # K8s deployment + service
-├── monitoring/
-│   ├── prometheus.yml             # Prometheus scrape config (API, node-exporter)
-│   └── grafana/                   # Grafana provisioning + dashboards (auto-provisioned)
-├── tests/
-│   ├── test_dags.py               # Airflow DAG structure tests (9 tests)
-│   ├── test_model.py              # Model training + prediction tests (7 tests)
-│   └── test_preprocessing.py      # Preprocessing integration tests (10 tests)
-├── docs/
-│   ├── model_card.md              # Model card (intended use, limitations, ethics)
-│   └── ml_pipeline.md             # ML pipeline design rationale
-├── envs/.env.example              # Environment variable template
-├── docker-compose.yml             # Dev environment (9 services)
-├── pyproject.toml                 # Dependencies (uv)
-└── ORGANISATION.md                # Project plan & task tracking
+**Variables d'environnement** — copier et adapter :
+```bash
+cp envs/.env.example envs/.env.dev
+# Modifier MLFLOW_TRACKING_URI selon l'environnement
 ```
 
-## CI/CD
+---
 
-**CI** (`.github/workflows/ci.yaml`): runs on every push/PR
-- Python 3.11
-- `uv run pytest tests/ -v` — 26 tests (DAGs + model + preprocessing)
-- `uv run ruff check .` — linting
+## ⚙️ CI/CD
 
-**CD** (`.github/workflows/cd.yml`): runs on push to `main`
-1. Run tests
-2. Build & push Docker images to GHCR + DockerHub (API + Webapp), tagged `latest` + git SHA
-3. Deploy to Kubernetes (conditional: skipped if `KUBECONFIG` secret not set)
+**CI** (`.github/workflows/ci.yaml`) — déclenché à chaque push/PR :
+- Python 3.11 · `uv run pytest tests/ -v` · `uv run ruff check .`
+- Audit sécurité : Bandit (SAST) · Safety (dépendances) · Trivy (SARIF → onglet Security)
 
-## Airflow Pipelines
+**CD** (`.github/workflows/cd.yml`) — déclenché sur push `main` :
+1. Tests complets
+2. Build & push images Docker → GHCR + DockerHub (`api` + `webapp`), tags `latest` + git SHA
+3. Déploiement Kubernetes (conditionnel : ignoré si secret `KUBECONFIG` absent)
+
+**Docs** (`.github/workflows/docs.yml`) — build Sphinx + déploiement GitHub Pages automatique.
+
+**Dependabot** — mises à jour automatiques pip (hebdo) + Actions/Docker (mensuel).
+
+---
+
+## 🔄 Pipelines Airflow
 
 ### `data_pipeline` — `@daily`
 ```
-download_dataset -> unzip_dataset -> merge_sensors -> preprocess -> sample_data (80%) -> trigger_training
+download_dataset → unzip_dataset → merge_sensors → preprocess → sample_data (80%) → trigger_training
 ```
-Random 80% sampling on each run simulates new data arrival on a static dataset, giving purpose to the champion/challenger model comparison.
+L'échantillonnage aléatoire à 80% à chaque run simule l'arrivée de nouvelles données sur un dataset statique, justifiant la comparaison champion/challenger.
 
-### `training_pipeline` — event-driven (triggered by data_pipeline)
+### `training_pipeline` — event-driven (déclenché par `data_pipeline`)
 ```
-train_model -> promote_or_reject
+train_model → promote_or_reject
 ```
-- Delegates training to `src/train.py` (separation of concerns)
-- Registers model in MLflow Model Registry
-- Compares new model F1 macro vs current Production model
-- Promotes if better, archives otherwise (versioning/rollback via MLflow stages)
+- Délègue l'entraînement à `src/train.py` (séparation des responsabilités)
+- Enregistre le modèle dans le MLflow Model Registry
+- Compare le F1 macro du nouveau modèle vs le modèle Production actuel
+- Promeut si meilleur, archive sinon (versioning/rollback via MLflow stages)
 
-## Objectives Coverage
+---
 
-**10/10 required objectives completed** + 3 bonus:
+## 📚 Documentation
 
-| # | Objective | Status |
-|---|-----------|--------|
-| 1 | Data extraction & preprocessing | Done — `data_ingestion.py` + `preprocess.py` + DAG |
-| 2 | ML model | Done — MultiOutputClassifier(RF), F1 > 0.94 on all targets |
-| 3 | Model registry | Done — MLflow Model Registry |
-| 4 | Airflow retraining pipeline | Done — 2 DAGs (data + training) |
-| 5 | MLflow experiment tracking | Done — params, metrics, artifacts |
-| 6 | API | Done — FastAPI, Pydantic, Swagger, `/predict`, `/health`, `/metrics` |
-| 7 | WebApp | Done — Streamlit, 2 tabs (prediction + model evaluation) |
-| 8 | Continuous Training | Done — daily sampling + champion/challenger F1 comparison |
-| 9 | Docker + K8s + CI/CD | Done — Docker Compose (9 services), K8s manifests, GitHub Actions CI/CD |
-| 10 | GitHub versioning & docs | Done — 20+ PRs, conventional commits, README, model card |
-| **12** | **Monitoring (bonus)** | Done — Prometheus + Grafana + Node Exporter + auto-provisioned dashboard |
-| **14** | **Model versioning/rollback (bonus)** | Done — MLflow Registry stages (None -> Production -> Archived) |
-| **17** | **Email alerting (bonus)** | Done — `on_failure_callback` on all DAGs |
+Documentation Sphinx déployée automatiquement sur GitHub Pages :
 
-## Team
+```bash
+# Build local
+uv run sphinx-apidoc -o docs/source src --force
+uv run sphinx-build -b html docs/source docs/build/html
+xdg-open docs/build/html/index.html
+```
 
-| Person | Scope |
-|--------|-------|
-| A | Data & ML pipeline (`src/train.py`, MLflow integration, metrics export) |
-| B | Airflow DAGs, continuous training, CI/CD, tests (26), alerting, docs |
-| C | FastAPI API (Pydantic), Streamlit webapp (2 tabs) |
-| D | Docker Compose (9 services), K8s manifests, CD pipeline, monitoring |
+---
 
-See `ORGANISATION.md` for detailed task tracking.
+## 🧪 Tests & qualité
 
-## Stack
+```bash
+uv run pytest tests/ -v                              # Tests unitaires & intégration
+uv run pytest --cov=src --cov-report=term-missing    # Avec couverture
+uv run ruff check .                                  # Linting
+uv run bandit -r src -ll                             # Sécurité SAST (optionnel)
+uv run safety scan                                   # Audit dépendances (optionnel)
+```
+
+---
+
+## 📁 Structure du projet
+
+```
+mlops-anomaly-detection/
+├── .github/
+│   ├── workflows/
+│   │   ├── ci.yaml              # CI : pytest + ruff + sécurité
+│   │   ├── cd.yml               # CD : build GHCR+DockerHub + deploy K8s
+│   │   └── docs.yml             # Docs : Sphinx → GitHub Pages
+│   └── dependabot.yml           # Mises à jour automatiques
+├── airflow/dags/
+│   ├── callbacks.py             # Alerting email sur échec (bonus)
+│   ├── data_pipeline.py         # DAG : ingestion + prétraitement + sampling
+│   └── training_pipeline.py     # DAG : entraînement + MLflow register + promote/reject
+├── api/
+│   ├── Dockerfile
+│   └── app.py                   # FastAPI prediction service + Prometheus /metrics
+├── webapp/
+│   ├── Dockerfile
+│   └── app.py                   # Streamlit UI (prédiction + évaluation modèle)
+├── src/
+│   ├── data_ingestion.py        # Téléchargement UCI + unzip + fusion capteurs
+│   ├── preprocess.py            # Filtrage, nettoyage, features + targets
+│   └── train.py                 # MultiOutput RF + MLflow tracking + export JSON
+├── k8s/
+│   ├── api-deployment.yaml
+│   └── webapp-deployment.yaml
+├── monitoring/
+│   ├── prometheus.yml
+│   └── grafana/                 # Provisioning + dashboards (auto-provisionnés)
+├── tests/
+│   ├── test_dags.py             # Tests structure DAGs Airflow (9 tests)
+│   ├── test_model.py            # Tests entraînement + prédiction (7 tests)
+│   └── test_preprocessing.py   # Tests intégration preprocessing (10 tests)
+├── docs/
+│   ├── source/                  # Documentation Sphinx
+│   ├── model_card.md            # Model card (usage, limites, éthique)
+│   └── ml_pipeline.md          # Conception du pipeline ML
+├── envs/
+│   └── .env.example             # Template variables d'environnement
+├── docker-compose.yml           # Environnement dev (8 services)
+├── pyproject.toml               # Dépendances (uv)
+└── ORGANISATION.md              # Plan & suivi des tâches
+```
+
+---
+
+## ✅ Couverture des objectifs
+
+**10/10 objectifs requis complétés** + 3 bonus :
+
+| # | Objectif | Statut |
+|---|----------|--------|
+| 1 | Extraction & prétraitement des données | ✅ `data_ingestion.py` + `preprocess.py` + DAG |
+| 2 | Modèle ML | ✅ MultiOutputClassifier(RF), F1 > 0.94 sur tous les targets |
+| 3 | Model registry | ✅ MLflow Model Registry |
+| 4 | Pipeline de réentraînement Airflow | ✅ 2 DAGs (data + training) |
+| 5 | MLflow experiment tracking | ✅ params, métriques, artefacts |
+| 6 | API | ✅ FastAPI, Pydantic, Swagger, `/predict`, `/health`, `/metrics` |
+| 7 | WebApp | ✅ Streamlit, 2 onglets (prédiction + évaluation modèle) |
+| 8 | Entraînement continu | ✅ sampling quotidien + comparaison champion/challenger F1 |
+| 9 | Docker + K8s + CI/CD | ✅ Docker Compose (8 services), K8s manifests, GitHub Actions |
+| 10 | Versioning GitHub & docs | ✅ 20+ PRs, commits conventionnels, README, model card |
+| **12** | **Monitoring (bonus)** | ✅ Prometheus + Grafana + Node Exporter + dashboard auto-provisionné |
+| **14** | **Versioning modèle/rollback (bonus)** | ✅ MLflow Registry stages (None → Production → Archived) |
+| **17** | **Alerting email (bonus)** | ✅ `on_failure_callback` sur tous les DAGs |
+
+---
+
+## 👥 Équipe
+
+| Membre | Périmètre |
+|--------|-----------|
+| A | Pipeline data & ML (`src/train.py`, intégration MLflow, export métriques) |
+| B | DAGs Airflow, entraînement continu, CI/CD, tests (26), alerting, docs |
+| C | API FastAPI (Pydantic), webapp Streamlit (2 onglets) |
+| D | Docker Compose (8 services), K8s manifests, pipeline CD, monitoring |
+
+Voir `ORGANISATION.md` pour le suivi détaillé des tâches.
+
+---
+
+## 🛠️ Stack
 
 Python 3.11 · scikit-learn · MLflow · Apache Airflow · FastAPI · Streamlit · Docker · Kubernetes · Prometheus · Grafana · GitHub Actions · uv
