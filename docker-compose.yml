@@ -52,15 +52,26 @@ services:
       - "5432:5432"
 
   # ── MLflow Tracking Server ─────────────────────────────────
+  # Artefacts stockés sur MinIO (S3-compatible) : modèles, métriques JSON
+  # --serve-artifacts : MLflow proxie les artefacts → les clients n'ont pas besoin
+  #   des credentials MinIO directement (seul ce service y accède).
   mlflow:
     image: ghcr.io/mlflow/mlflow:v3.1.0
-    command: >
-      mlflow server
-      --backend-store-uri sqlite:////mlflow/mlflow.db
-      --artifacts-destination /mlflow/artifacts
-      --serve-artifacts
-      --host 0.0.0.0
-      --port 5000
+    entrypoint: >
+      bash -c "pip install boto3 -q &&
+               mlflow server
+               --backend-store-uri sqlite:////mlflow/mlflow.db
+               --artifacts-destination s3://${MINIO_BUCKET:-mlops}/mlflow
+               --serve-artifacts
+               --host 0.0.0.0
+               --port 5000"
+    environment:
+      MLFLOW_S3_ENDPOINT_URL: ${MINIO_ENDPOINT_URL:-http://89.58.44.97:9000}
+      AWS_ACCESS_KEY_ID: ${MINIO_ACCESS_KEY}
+      AWS_SECRET_ACCESS_KEY: ${MINIO_SECRET_KEY}
+    env_file:
+      - path: envs/.env.dev
+        required: false
     volumes:
       - mlflow_data:/mlflow
     ports:
