@@ -27,7 +27,36 @@ jobs:
       - name: Run tests
         env:
           MLFLOW_TRACKING_URI: ./mlruns
-        run: uv run pytest
+        run: uv run pytest --cov=src --cov-branch --cov-fail-under=20 --cov-report=xml
 
       - name: Lint with Ruff
         run: uv run ruff check .
+
+      - name: Security scan — Bandit
+        run: uv run bandit -r src/ -ll
+
+      - name: Security scan — Safety
+        run: uv run safety scan --short-report
+        continue-on-error: true
+
+  security-scan:
+    name: Trivy vulnerability scan
+    runs-on: ubuntu-latest
+    permissions:
+      security-events: write
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Trivy filesystem scan
+        uses: aquasecurity/trivy-action@master
+        with:
+          scan-type: fs
+          format: sarif
+          output: trivy-results.sarif
+          severity: HIGH,CRITICAL
+
+      - name: Upload Trivy results to GitHub Security tab
+        uses: github/codeql-action/upload-sarif@v3
+        with:
+          sarif_file: trivy-results.sarif
