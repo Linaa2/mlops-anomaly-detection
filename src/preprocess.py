@@ -6,12 +6,23 @@ INPUT_PATH = "data/raw/hydraulic_data.csv"
 OUTPUT_PATH = "data/processed/hydraulic_clean.csv"
 
 SENSORS = [
-    "PS1", "PS2", "PS3", "PS4", "PS5", "PS6",
+    "PS1",
+    "PS2",
+    "PS3",
+    "PS4",
+    "PS5",
+    "PS6",
     "EPS1",
-    "FS1", "FS2",
-    "TS1", "TS2", "TS3", "TS4",
+    "FS1",
+    "FS2",
+    "TS1",
+    "TS2",
+    "TS3",
+    "TS4",
     "VS1",
-    "CE", "CP", "SE",
+    "CE",
+    "CP",
+    "SE",
 ]
 
 TARGETS = ["cooler_condition", "valve_condition", "pump_leakage", "accumulator_pressure"]
