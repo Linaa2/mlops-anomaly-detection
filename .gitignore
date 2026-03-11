@@ -7,3 +7,19 @@ mlruns/
 notebooks/
 context/
 .claude/
+# Env files
+envs/.env.dev
+envs/.env.prod
+.env
+
+# Logs
+logs/
+*.log
+
+# MLflow
+mlflow/artifacts/
+
+# Python
+__pycache__/
+*.pyc
+.venv/
