@@ -150,8 +150,6 @@ volumes:
   mlflow_artifacts:
   grafana_data:
 
-# ── Chargement automatique env dev ────────────────────────
-# Lancer avec : docker compose --env-file envs/.env.dev up
 
   # ── Node Exporter (system metrics) ────────────────────────
   node-exporter:
@@ -159,3 +157,8 @@ volumes:
     ports:
       - "9100:9100"
     restart: always
+
+volumes:
+  postgres_data:
+  mlflow_artifacts:
+  grafana_data:

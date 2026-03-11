@@ -91,3 +91,77 @@ mlops-anomaly-detection/
 ├── Dockerfile.webapp
 ├── docker-compose.yml
 └── README.md
+## Infrastructure & MLOps
+
+Cette section couvre le déploiement, l'orchestration et le monitoring du projet.
+
+### Environnements
+
+| Env | Outil | Commande |
+|-----|-------|----------|
+| `dev` | Docker Compose | `docker compose --env-file envs/.env.dev up` |
+| `prod` | Kubernetes | `kubectl apply -f k8s/` |
+
+### Services (dev)
+
+| Service | Port | Rôle |
+|---------|------|------|
+| Airflow | 8080 | Orchestration des pipelines |
+| MLflow | 5000 | Tracking des expériences |
+| FastAPI | 8000 | API de prédiction |
+| Streamlit | 8501 | Interface utilisateur |
+| Prometheus | 9090 | Collecte des métriques |
+| Grafana | 3000 | Dashboards monitoring |
+
+
+
+### CI/CD
+
+Le pipeline GitHub Actions (`.github/workflows/cd.yml`) :
+1. Lance les tests (`pytest`)
+2. Build les images Docker et les push sur DockerHub
+3. Déploie automatiquement sur Kubernetes au push sur `main`
+
+### Monitoring
+
+- **Prometheus** — scrape les métriques FastAPI via `/metrics`
+- **Grafana** — dashboard auto-provisionné : requests/sec, latence p95, anomaly scores, DAG success rate
+
+### Lancer le projet
+
+**Dev (Docker Compose) :**
+```bash
+# 1. Cloner et installer
+git clone <repo>
+uv sync
+
+# 2. Lancer tous les services
+docker compose --env-file envs/.env.dev up --build
+
+# 3. Arrêter
+docker compose down
+```
+
+**Prod (Kubernetes) :**
+```bash
+# 1. Créer le namespace
+kubectl create namespace mlops
+
+# 2. Appliquer les secrets
+kubectl create secret generic mlops-secrets \
+  --from-literal=MLFLOW_TRACKING_URI=http://mlflow:5000 \
+  --namespace mlops
+
+# 3. Déployer
+kubectl apply -f k8s/
+
+# 4. Vérifier
+kubectl get pods -n mlops
+kubectl get services -n mlops
+```
+
+**Monitoring :**
+```bash
+# Grafana  → http://localhost:3000  (admin / admin)
+# Prometheus → http://localhost:9090
+```
