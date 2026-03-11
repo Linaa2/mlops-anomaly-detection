@@ -33,3 +33,8 @@ mlflow.db
 
 # Generated reports
 reports/
+
+# Test artifacts
+.coverage
+htmlcov/
+.pytest_cache/
