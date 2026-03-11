@@ -85,7 +85,7 @@
 
 ---
 
-## État du Projet (mis à jour 11 mars 2026 — post merge PR #16)
+## État du Projet (mis à jour 11 mars 2026 — post merge PR #20)
 
 ### Composants Fonctionnels ✅
 
@@ -94,8 +94,8 @@
 | Data ingestion | `src/data_ingestion.py` | ✅ Download UCI + unzip + merge 17 capteurs + profile.txt |
 | Preprocessing | `src/preprocess.py` | ✅ Filtre stable_flag, sélection features+targets, dropna |
 | Training + MLflow | `src/train.py` | ✅ MultiOutput RF, MLflow tracking (params, métriques, artifact), export JSON métriques |
-| API | `api/app.py` | ✅ FastAPI, Pydantic body, 17 features, 4 targets, MultiOutputClassifier |
-| WebApp | `webapp/app.py` | ✅ Streamlit, capteurs hydrauliques, 2 onglets (prediction + model evaluation) |
+| API | `api/app.py` | ✅ FastAPI, Pydantic body, 17 features, 4 targets, `/metrics` Prometheus |
+| WebApp | `webapp/app.py` | ✅ Streamlit, capteurs hydrauliques, 2 onglets (prediction + model evaluation), API_URL configurable via env var |
 | DAG data | `airflow/dags/data_pipeline.py` | ✅ 6 tâches : download→unzip→merge→preprocess→sample(80%)→trigger training |
 | DAG training | `airflow/dags/training_pipeline.py` | ✅ 2 tâches : train_model→promote_or_reject (délègue à src/train.py) |
 | Alerting | `airflow/dags/callbacks.py` | ✅ Email failure callback sur tous les DAGs |
@@ -103,25 +103,32 @@
 | Tests modèle | `tests/test_model.py` | ✅ 7 tests (training, predictions, F1, feature/target validation) |
 | Tests preprocessing | `tests/test_preprocessing.py` | ✅ 10 tests (merge, preprocess, NaN, cross-module consistency) |
 | CI | `.github/workflows/ci.yaml` | ✅ Python 3.11, pytest + ruff sur push/PR |
-| CD | `.github/workflows/cd.yml` | ✅ test→build-push DockerHub→deploy K8s (conditionnel) |
+| CD | `.github/workflows/cd.yml` | ✅ test→build-push GHCR+DockerHub→deploy K8s (conditionnel via check-deploy job) |
 | K8s manifests | `k8s/` | ✅ api + webapp deployments |
 | Dockerfiles | `api/Dockerfile`, `webapp/Dockerfile` | ✅ |
 | Docker Compose | `docker-compose.yml` | ✅ 9 services, volumes corrigés (DAGs + Grafana) |
-| Monitoring configs | `monitoring/` | ✅ Prometheus scrape + Grafana provisioning + dashboard JSON |
-| Model metrics report | `reports/model_metrics.json` | ✅ Métriques détaillées exportées par train.py |
-| Documentation | `README.md`, `docs/model_card.md` | ✅ Architecture, setup, model card |
+| Monitoring configs | `monitoring/` | ✅ Prometheus scrape (API /metrics + node-exporter) + Grafana provisioning + dashboard JSON |
+| Model metrics report | `reports/model_metrics.json` | ✅ Métriques détaillées exportées par train.py (gitignored) |
+| Documentation | `README.md`, `docs/model_card.md`, `docs/ml_pipeline.md` | ✅ Architecture, setup, model card, ML rationale |
 | Env example | `envs/.env.example` | ✅ Variables documentées |
 | Python harmonisé | `.python-version`, CI, pyproject.toml | ✅ Tout en 3.11 |
 
-### Problèmes à Résoudre 🔴🟡
+### Problèmes Résolus ✅ (historique)
 
-| # | Sévérité | Problème | Fichier | Action |
-|---|----------|----------|---------|--------|
-| 1 | 🔴 | `mlflow.db` (612K SQLite) commité dans le repo | `mlflow.db` | Supprimer du tracking git (déjà dans .gitignore mais déjà commité) |
-| 2 | 🟡 | API charge `models/model.pkl` en local au lieu du MLflow Registry | `api/app.py` | Idéalement charger depuis MLflow Registry pour cohérence avec le DAG promote/reject — acceptable pour la démo si model.pkl existe |
-| 3 | 🟡 | WebApp hardcode `API_URL = "http://127.0.0.1:8000"` | `webapp/app.py` | Ne fonctionnera pas dans Docker Compose (devrait être `os.getenv("API_URL", "http://api:8000")`) |
-| 4 | 🟡 | `reports/model_metrics.json` commité | `reports/` | Fichier généré — devrait être dans .gitignore (mineur, utile pour la démo webapp) |
-| 5 | 🟡 | Pas d'endpoint `/metrics` Prometheus dans l'API | `api/app.py` | `prometheus-fastapi-instrumentator` jamais initialisé |
+| # | Problème | Résolution |
+|---|----------|------------|
+| 1 | `mlflow.db` (612K SQLite) commité dans le repo | `git rm --cached mlflow.db` (PR #17) |
+| 2 | WebApp hardcodait `API_URL = "http://127.0.0.1:8000"` | Remplacé par `os.getenv("API_URL", "http://api:8000")` (PR #17) |
+| 3 | `reports/model_metrics.json` commité | Ajouté `reports/` à .gitignore, `git rm --cached` (PR #17) |
+| 4 | Pas d'endpoint `/metrics` Prometheus dans l'API | Initialisé `prometheus-fastapi-instrumentator` (PR #17) |
+| 5 | CD `secrets.KUBECONFIG` invalide dans `if:` job-level | Ajouté job `check-deploy` intermédiaire (PR #19) |
+
+### Problèmes Restants 🟡
+
+| # | Sévérité | Problème | Notes |
+|---|----------|----------|-------|
+| 1 | 🟡 | API charge `models/model.pkl` en local au lieu du MLflow Registry | Acceptable pour la démo — en prod, chargerait depuis MLflow Registry |
+| 2 | 🟡 | `.coverage` commité dans le repo (PR #21) | Artefact pytest, devrait être dans .gitignore |
 
 ---
 
@@ -153,14 +160,16 @@
 ### Personne C — API & WebApp
 - [x] Réécrire `api/app.py` : Pydantic body, 17 features, 4 targets, MultiOutputClassifier
 - [x] Réécrire `webapp/app.py` : capteurs hydrauliques, 2 onglets (prediction + model evaluation)
-- [ ] **🟡 Fix API_URL hardcodé** dans webapp (127.0.0.1 → env var)
-- [ ] **🟡 Endpoint `/metrics`** : initialiser `prometheus-fastapi-instrumentator`
+- [x] Fix API_URL hardcodé dans webapp (127.0.0.1 → env var) — PR #17
+- [x] Endpoint `/metrics` : initialiser `prometheus-fastapi-instrumentator` — PR #17
 - [ ] Tests unitaires API (endpoint `/predict`, `/health`)
 
 ### Personne D — Infra & DevOps
 - [x] `docker-compose.yml` : Airflow + MLflow + FastAPI + Streamlit + Prometheus + Grafana
 - [x] Manifests K8s : `api-deployment.yaml`, `webapp-deployment.yaml`
-- [x] GitHub Actions `cd.yml` : build → push DockerHub → deploy K8s
+- [x] GitHub Actions `cd.yml` : build → push GHCR + DockerHub → deploy K8s (conditionnel)
+- [x] Fix CD : job `check-deploy` pour secrets dans `if:` — PR #19
+- [x] CD : dual registry GHCR + DockerHub — PR #18
 - [x] `Dockerfile` API + WebApp
 - [x] `envs/.env.example`
 - [x] Monitoring Prometheus + Grafana (dashboards + provisioning)
@@ -172,21 +181,19 @@
 
 ### Priorité 1 — Avant la présentation 🔴
 
-1. **Supprimer `mlflow.db` du repo** : `git rm --cached mlflow.db` (déjà dans .gitignore)
-2. **Valider end-to-end `docker-compose up`** : tous les services doivent être healthy
-3. **Prendre les screenshots** pour la présentation (Airflow UI, MLflow UI, Swagger, Streamlit, Grafana)
+1. **Valider end-to-end `docker-compose up`** : tous les services doivent être healthy
+2. **Prendre les screenshots** pour la présentation (Airflow UI, MLflow UI, Swagger, Streamlit, Grafana, GitHub CI/CD)
+3. **Créer la présentation PDF** (basée sur `docs/presentation_prep.md`)
 
 ### Priorité 2 — Nice to have 🟡
 
-4. **Fix `webapp/app.py` API_URL** : utiliser `os.getenv("API_URL", "http://api:8000")` au lieu de hardcoded 127.0.0.1
-5. **Ajouter `/metrics` endpoint** dans l'API (prometheus-fastapi-instrumentator)
-6. **Ajouter `reports/` à .gitignore** (fichiers générés)
-7. **Tests unitaires API** : `/predict`, `/health`
+4. **Tests unitaires API** : `/predict`, `/health`
+5. **Supprimer `.coverage` du repo** : `git rm --cached .coverage`, ajouter à .gitignore
 
-### Priorité 3 — Bonus
+### Priorité 3 — Bonus non réalisés
 
-8. Tests de charge Locust
-9. Rollback modèle via MLflow stages demo
+6. Tests de charge Locust
+7. Rollback modèle via MLflow stages demo
 
 ---
 
