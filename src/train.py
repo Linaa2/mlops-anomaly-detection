@@ -5,17 +5,22 @@ import pandas as pd
 from sklearn.ensemble import IsolationForest
 from sklearn.preprocessing import StandardScaler
 
-INPUT_PATH = "data/processed/weather_clean.csv"
+INPUT_PATH = "data/processed/hydraulic_clean.csv"
 MODEL_PATH = "models/model.pkl"
 SCALER_PATH = "models/scaler.pkl"
-OUTPUT_PATH = "data/processed/weather_with_predictions.csv"
+OUTPUT_PATH = "data/processed/hydraulic_with_predictions.csv"
 
 FEATURES = [
-    "temperature",
-    "humidity",
-    "wind_speed",
-    "pressure",
-    "precipitation",
+    "PS1",
+    "PS2",
+    "PS3",
+    "TS1",
+    "TS2",
+    "TS3",
+    "TS4",
+    "VS1",
+    "CE",
+    "CP",
 ]
 
 

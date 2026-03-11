@@ -3,11 +3,16 @@ import pandas as pd
 from fastapi import FastAPI
 
 FEATURES = [
-    "temperature",
-    "humidity",
-    "wind_speed",
-    "pressure",
-    "precipitation",
+    "PS1",
+    "PS2",
+    "PS3",
+    "TS1",
+    "TS2",
+    "TS3",
+    "TS4",
+    "VS1",
+    "CE",
+    "CP",
 ]
 
 app = FastAPI()
@@ -18,7 +23,7 @@ scaler = joblib.load("models/scaler.pkl")
 
 @app.get("/")
 def home():
-    return {"message": "Weather anomaly detection API"}
+    return {"message": "Hydraulic anomaly detection API"}
 
 
 @app.get("/health")
@@ -28,14 +33,19 @@ def health():
 
 @app.post("/predict")
 def predict(
-    temperature: float,
-    humidity: float,
-    wind_speed: float,
-    pressure: float,
-    precipitation: float,
+    PS1: float,
+    PS2: float,
+    PS3: float,
+    TS1: float,
+    TS2: float,
+    TS3: float,
+    TS4: float,
+    VS1: float,
+    CE: float,
+    CP: float,
 ):
     X = pd.DataFrame(
-        [[temperature, humidity, wind_speed, pressure, precipitation]],
+        [[PS1, PS2, PS3, TS1, TS2, TS3, TS4, VS1, CE, CP]],
         columns=FEATURES,
     )
 

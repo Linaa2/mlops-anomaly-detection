@@ -1,98 +1,93 @@
-# MLOps Anomaly Detection
+# Détection d’anomalies dans un système hydraulique
 
-## Objective
-Detect anomalies in system/server metrics using a simple ML pipeline.
+## Objectif
 
-## Stack
+Ce projet vise à détecter des comportements anormaux dans un système hydraulique à partir de données issues de capteurs industriels.  
+Nous mettons en place un pipeline de machine learning permettant de :
+
+- récupérer et préparer les données,
+- entraîner un modèle de détection d’anomalies,
+- exposer le modèle via une API,
+- préparer une intégration MLOps avec suivi, tests et conteneurisation.
+
+## Jeu de données
+
+Le projet utilise le dataset **Condition Monitoring of Hydraulic Systems** de l’UCI Machine Learning Repository.
+
+Les données proviennent de plusieurs capteurs industriels, notamment :
+
+- capteurs de pression (`PS1`, `PS2`, `PS3`)
+- capteurs de température (`TS1`, `TS2`, `TS3`, `TS4`)
+- capteur de vibration (`VS1`)
+- variables d’efficacité et de puissance (`CE`, `CP`)
+
+Chaque fichier capteur est traité puis fusionné dans un CSV unique.
+
+## Pipeline du projet
+
+Le pipeline suit les étapes suivantes :
+
+1. **Ingestion des données**
+   - téléchargement du dataset
+   - décompression
+   - lecture des fichiers capteurs
+   - fusion en un CSV unique
+
+2. **Prétraitement**
+   - sélection des variables utiles
+   - suppression des valeurs manquantes
+   - sauvegarde des données nettoyées
+
+3. **Entraînement**
+   - standardisation des données avec `StandardScaler`
+   - entraînement d’un modèle `IsolationForest`
+   - calcul des prédictions et scores d’anomalie
+   - sauvegarde du modèle et des résultats
+
+4. **Exposition via API**
+   - déploiement d’un service FastAPI
+   - prédiction sur de nouvelles mesures capteurs
+
+## Modèle utilisé
+
+Le modèle choisi est **Isolation Forest**.
+
+Ce choix est motivé par le fait qu’il s’agit d’un algorithme bien adapté à la détection d’anomalies dans des données tabulaires multivariées, notamment dans un contexte de surveillance industrielle.
+
+## Stack technique
+
 - Python
+- pandas
 - scikit-learn
-- MLflow
 - FastAPI
 - uv
 - GitHub Actions
 - Ruff
 - Pytest
-
-## Project structure
-...
-
-## Run locally
-```bash
-uv sync
-uv run python src/train.py
-uv run pytest
-uv run uvicorn api.app:app --reload
-
----
-
-## 10. Préparer la démo de demain
-Il faut déjà savoir ce que tu montreras.
-
-### Démo simple
-1. montrer le repo
-2. montrer le CI GitHub Actions
-3. lancer l’entraînement
-4. montrer MLflow
-5. lancer l’API
-6. faire une prédiction
-
-Ça suffit largement pour un POC d’une journée.
-
----
-
-# Ordre optimal à partir de maintenant
-
-Je te conseille cet ordre exact :
-
-## Bloc 1 — indispensable
-1. choisir le dataset
-2. mettre les données dans `data/raw`
-3. coder `preprocess.py`
-4. coder `train.py`
-
-## Bloc 2 — très important
-5. sauvegarder le modèle
-6. coder `api/app.py`
-7. coder un test simple
-
-## Bloc 3 — finition MLOps
-8. ajouter MLflow
-9. finaliser README
-10. push GitHub + vérifier CI
-
----
-
-# Ce qui n’est pas prioritaire
-Tu peux le laisser pour plus tard si tu manques de temps :
-
+- MLflow
 - Docker
-- DVC
-- déploiement cloud
-- monitoring avancé
-- gros notebook exploratoire
 
-Pour demain, ce n’est pas ça qui te sauvera.  
-Ce qui compte, c’est :
+## Structure du projet
 
-- repo propre
-- CI vert
-- modèle qui tourne
-- API qui répond
-- explication claire
-
----
-
-# En vrai, ton minimum viable pour demain
-Si tu arrives avec ça, c’est déjà très bien :
-
-- un repo GitHub propre
-- un dataset prêt
-- un script d’entraînement
-- un modèle sauvegardé
-- une API FastAPI
-- un CI GitHub Actions qui passe
-- un README correct
-
-Ça, c’est déjà un **vrai mini projet MLOps**.
-
-Si tu veux, on peut maintenant faire la suite dans l’ordre le plus utile : **choisir tout de suite la thématique + le dataset + la structure exacte des scripts**.
+```text
+mlops-anomaly-detection/
+│
+├── api/
+│   └── app.py
+├── data/
+│   ├── raw/
+│   └── processed/
+├── models/
+├── notebooks/
+├── src/
+│   ├── data_ingestion.py
+│   ├── preprocess.py
+│   └── train.py
+├── tests/
+├── webapp/
+├── .github/workflows/
+├── pyproject.toml
+├── Dockerfile.api
+├── Dockerfile.webapp
+├── docker-compose.yml
+└── README.md

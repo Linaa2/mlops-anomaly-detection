@@ -2,15 +2,20 @@ from pathlib import Path
 
 import pandas as pd
 
-INPUT_PATH = "data/raw/weather.csv"
-OUTPUT_PATH = "data/processed/weather_clean.csv"
+INPUT_PATH = "data/raw/hydraulic_data.csv"
+OUTPUT_PATH = "data/processed/hydraulic_clean.csv"
 
 FEATURES = [
-    "temperature",
-    "humidity",
-    "wind_speed",
-    "pressure",
-    "precipitation",
+    "PS1",
+    "PS2",
+    "PS3",
+    "TS1",
+    "TS2",
+    "TS3",
+    "TS4",
+    "VS1",
+    "CE",
+    "CP",
 ]
 
 
