@@ -16,7 +16,6 @@ RUN pip install uv && uv sync --frozen --no-dev
 
 # Copier le code
 COPY api/ ./api/
-COPY src/ ./src/
 
 RUN useradd --create-home appuser
 USER appuser

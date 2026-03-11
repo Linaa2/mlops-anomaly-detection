@@ -8,7 +8,7 @@ import streamlit as st
 
 API_BASE = os.getenv("API_URL", "http://api:8000")
 API_URL = f"{API_BASE}/predict"
-METRICS_PATH = Path("reports/model_metrics.json")
+METRICS_PATH = Path(os.getenv("METRICS_PATH", "reports/model_metrics.json"))
 
 FEATURES = [
     "PS1",

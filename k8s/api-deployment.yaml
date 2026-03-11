@@ -24,7 +24,7 @@ spec:
     spec:
       containers:
         - name: api
-          image: $DOCKERHUB_USERNAME/mlops-api:latest
+          image: IMAGE_API
           ports:
             - containerPort: 8000
           env:
