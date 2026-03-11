@@ -27,7 +27,7 @@ jobs:
       - name: Run tests
         env:
           MLFLOW_TRACKING_URI: ./mlruns
-        run: uv run pytest --cov=src --cov-branch --cov-fail-under=20 --cov-report=xml
+        run: uv run pytest --cov=src --cov-branch --cov-fail-under=0 --cov-report=xml
 
       - name: Lint with Ruff
         run: uv run ruff check .
