@@ -25,7 +25,7 @@ logger = logging.getLogger(__name__)
 ALERT_EMAIL = os.getenv("ALERT_EMAIL", "team@example.com")
 MLFLOW_TRACKING_URI = os.getenv("MLFLOW_TRACKING_URI", "http://mlflow:5000")
 MODEL_NAME = "hydraulic-anomaly-detector"
-FEATURES_PATH = os.getenv("FEATURES_PATH", "data/processed/hydraulic_sample.csv")
+EXPERIMENT_NAME = "hydraulic-condition-monitoring"
 
 default_args = {
     "owner": "airflow",
@@ -35,8 +35,20 @@ default_args = {
 }
 
 
+def _compute_f1_macro(run) -> float:
+    """Compute the average of per-target F1 metrics from an MLflow run."""
+    from src.train import TARGETS
+
+    f1_values = []
+    for target in TARGETS:
+        val = run.data.metrics.get(f"f1_macro_{target}")
+        if val is not None:
+            f1_values.append(float(val))
+    return sum(f1_values) / len(f1_values) if f1_values else 0.0
+
+
 def _get_production_f1() -> float | None:
-    """Return the F1 metric of the current Production model, or None if no model exists."""
+    """Return the mean F1 of the current Production model, or None if absent."""
     import mlflow
     from mlflow.exceptions import MlflowException
     from mlflow.tracking import MlflowClient
@@ -47,89 +59,64 @@ def _get_production_f1() -> float | None:
         versions = client.get_latest_versions(MODEL_NAME, stages=["Production"])
         if not versions:
             return None
-        run_id = versions[0].run_id
-        run = client.get_run(run_id)
-        return float(run.data.metrics.get("f1_macro", 0.0))
+        run = client.get_run(versions[0].run_id)
+        return _compute_f1_macro(run)
     except MlflowException as exc:
         if "RESOURCE_DOES_NOT_EXIST" in str(exc):
-            # Model not registered yet — treat as no Production model
             return None
         logger.exception("MLflow error while fetching Production F1 for %s", MODEL_NAME)
         raise
 
 
 def train_and_log(**context) -> str:
-    """Train multi-output model, log to MLflow, register in Model Registry.
+    """Delegate training to src.train.train(), then register model in MLflow Registry.
 
-    Uses the same FEATURES/TARGETS as src/train.py but wraps training
-    with MLflow tracking and model registry.  Returns run_id via XCom.
+    src/train.py handles: data loading, train/test split, model fitting,
+    MLflow run creation, param/metric logging, and artifact saving.
+
+    This task adds: Model Registry registration (needed for promote/reject).
+    Returns the run_id via XCom.
     """
     import mlflow
-    import mlflow.sklearn
-    import numpy as np
-    import pandas as pd
-    from sklearn.ensemble import RandomForestClassifier
-    from sklearn.metrics import f1_score
-    from sklearn.model_selection import train_test_split
-    from sklearn.multioutput import MultiOutputClassifier
-
-    from src.train import FEATURES, TARGETS
+    from mlflow.tracking import MlflowClient
 
     mlflow.set_tracking_uri(MLFLOW_TRACKING_URI)
 
-    df = pd.read_csv(FEATURES_PATH)
+    from src.train import TARGETS, train
 
-    X = df[FEATURES].values
-    y = df[TARGETS].values
+    # src/train.py creates an MLflow run, logs params/metrics/artifact
+    train()
 
-    X_train, X_test, y_train, y_test = train_test_split(
-        X,
-        y,
-        test_size=0.2,
-        random_state=42,
-        stratify=y[:, 0],
+    # Retrieve the run that train() just created
+    client = MlflowClient()
+    experiment = client.get_experiment_by_name(EXPERIMENT_NAME)
+    if experiment is None:
+        raise RuntimeError(f"Experiment '{EXPERIMENT_NAME}' not found after training.")
+
+    runs = client.search_runs(
+        experiment_ids=[experiment.experiment_id],
+        order_by=["start_time DESC"],
+        max_results=1,
     )
+    if not runs:
+        raise RuntimeError("No MLflow run found after training.")
 
-    model = MultiOutputClassifier(
-        RandomForestClassifier(n_estimators=100, random_state=42),
-    )
-    model.fit(X_train, y_train)
-    y_pred = model.predict(X_test)
+    run = runs[0]
+    run_id = run.info.run_id
 
-    # Compute per-target macro F1 and overall macro average
-    per_target_f1 = {}
-    for i, target in enumerate(TARGETS):
-        per_target_f1[target] = float(
-            f1_score(y_test[:, i], y_pred[:, i], average="macro", zero_division=0)
-        )
+    # Register the model artifact in the Model Registry for promote/reject
+    model_uri = f"runs:/{run_id}/model"
+    mlflow.register_model(model_uri, MODEL_NAME)
 
-    f1_macro = float(np.mean(list(per_target_f1.values())))
-
-    with mlflow.start_run() as run:
-        mlflow.log_param("model_type", "MultiOutputClassifier(RandomForestClassifier)")
-        mlflow.log_param("n_estimators", 100)
-        mlflow.log_param("features", FEATURES)
-        mlflow.log_param("targets", TARGETS)
-        mlflow.log_param("n_samples", len(df))
-        mlflow.log_param("n_train", len(X_train))
-        mlflow.log_param("n_test", len(X_test))
-
-        mlflow.log_metric("f1_macro", f1_macro)
-        for target, f1_val in per_target_f1.items():
-            mlflow.log_metric(f"f1_{target}", f1_val)
-
-        mlflow.sklearn.log_model(
-            sk_model=model,
-            artifact_path="model",
-            registered_model_name=MODEL_NAME,
-        )
-        run_id = run.info.run_id
+    # Log the overall f1_macro for easier comparison in promote_or_reject
+    f1_macro = _compute_f1_macro(run)
+    client.log_metric(run_id, "f1_macro", f1_macro)
 
     logger.info(
         "Run %s | F1 macro: %.4f | Per-target: %s",
         run_id,
         f1_macro,
-        {k: f"{v:.4f}" for k, v in per_target_f1.items()},
+        {t: f"{run.data.metrics.get(f'f1_macro_{t}', 0.0):.4f}" for t in TARGETS},
     )
     return run_id
 
@@ -147,7 +134,7 @@ def promote_or_reject(**context) -> None:
         raise ValueError("No run_id received from train_model task.")
 
     run = client.get_run(run_id)
-    new_f1 = float(run.data.metrics.get("f1_macro", 0.0))
+    new_f1 = _compute_f1_macro(run)
 
     versions = client.get_latest_versions(MODEL_NAME, stages=["None", "Staging"])
     if not versions:
