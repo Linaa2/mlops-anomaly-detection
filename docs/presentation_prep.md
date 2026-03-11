@@ -1,334 +1,187 @@
-# Presentation Prep — Hydraulic Condition Monitoring (MLOps)
+# Préparation de la présentation — Hydraulic Condition Monitoring (MLOps)
 
-> DATA713 — 6 min presentation + 4 min Q&A
-> Focus: system design justification, stack choices, architecture coherence
-
----
-
-## Slide Plan (6 min budget)
-
-> **Structure the presentation around evaluation criteria**, not around chronological work.
-> The grading criteria are: code quality, good AI usage, Airflow+CI/CD automation, MLflow usage, API+WebApp functionality, architecture coherence, GitHub collaboration.
-
-### Slide 1 — Title + Context (30s)
-
-**Content:**
-- Project: Condition Monitoring of Hydraulic Systems
-- Use case: multi-class multi-output classification of 4 component states
-- Dataset: UCI — 2205 cycles, 17 sensors, 4 targets
-- Team: 4 people
-
-**Speaker notes:**
-- Industrial predictive maintenance scenario
-- Static dataset but CT pipeline designed for production-readiness
-- Key point: we chose supervised classification over anomaly detection (why: labeled data available via `profile.txt`, more actionable predictions per component)
+> DATA713 — 6 min de présentation + 4 min de Q&A
+> Axe : justification des choix de conception, cohérence de l'architecture, retour honnête sur les limites
 
 ---
 
-### Slide 2 — Architecture Overview (1m30)
+## Structure des slides (budget 6 min)
 
-**Content:** Architecture diagram showing the full system
+| # | Slide | Durée | Qui parle |
+|---|-------|-------|-----------|
+| 1 | Titre | 15s | — |
+| 2 | Contexte & Problématique | 30s | |
+| 3 | Vue d'ensemble de l'architecture | 45s | |
+| 4 | Pipeline ML & Continuous Training | 1m | |
+| 5 | Intégration Continue (CI) | 45s | |
+| 6 | API & WebApp | 45s | |
+| 7 | Déploiement | 45s | |
+| 8 | Monitoring & Alerting | 45s | |
+| 9 | Couverture des objectifs | 30s | |
 
-```
-                     GitHub (source)
-                          |
-                   CI (pytest + ruff)
-                          |
-                    CD (build + push)
-                          |
-           +--------------+--------------+
-           |                             |
-     Docker Compose (dev)          K8s (prod)
-           |
-    +------+------+------+------+------+------+
-    |      |      |      |      |      |      |
-  Postgres Airflow MLflow  API  Webapp Prom  Grafana
-           |      |       |      |      |      |
-           |      +---<---+      |      +--<---+
-           |              |      |
-      DAGs:               FastAPI Streamlit
-      - data_pipeline     (serve) (UI: prediction
-      - training_pipeline          + model eval)
-```
-
-**Key points to justify:**
-1. **Docker Compose for dev** — single `docker-compose up` brings up 9 services (Postgres, Airflow webserver+scheduler+init, MLflow, FastAPI, Streamlit, Prometheus, Grafana, Node Exporter). No manual setup.
-2. **K8s for prod** — manifests ready, CD pipeline conditional on `KUBECONFIG` secret (honest: no cluster for school project, but pipeline is ready)
-3. **Airflow as orchestrator** — required by course, but also the right choice for DAG-based batch pipelines
-4. **MLflow as metadata store + registry** — tracks experiments, stores model artifacts, enables promote/reject logic
+**Slides backup (pour le Q&A) :**
+- Backup 1 : Airflow UI (screenshots)
+- Backup 2 : MLflow UI (screenshots)
+- Backup 3 : API & WebApp (screenshots)
+- Backup 4 : Monitoring & GitHub (screenshots)
+- Backup 5 : Collaboration & Leçons apprises
 
 ---
 
-### Slide 3 — ML Pipeline + Continuous Training (1m30)
+## Texte oral — slide par slide
 
-**Content:**
+### Slide 1 — Titre (15s)
 
-**Model:** `MultiOutputClassifier(RandomForestClassifier)` — scikit-learn
-- 17 sensor features (PS1-PS6, EPS1, FS1-FS2, TS1-TS4, VS1, CE, CP, SE)
-- 4 targets: cooler condition, valve condition, pump leakage, accumulator pressure
-- Metrics: F1 macro, accuracy, precision, recall per target
-
-**Results (test set 20%):**
-
-| Target | Accuracy | F1 macro |
-|--------|----------|----------|
-| Cooler condition | 1.000 | 1.000 |
-| Valve condition | 0.948 | 0.947 |
-| Pump leakage | 0.993 | 0.993 |
-| Accumulator pressure | 0.990 | 0.990 |
-
-**CT Logic (2 Airflow DAGs):**
-
-```
-data_pipeline (@daily)                training_pipeline (event-driven)
-  download_data                         train_model (delegates to src/train.py)
-  preprocess_data                       promote_or_reject (champion/challenger)
-  sample_training_data (80%)
-  trigger_training ──────────────────>  (schedule=None)
-```
-
-**Design decisions to justify:**
-
-| Decision | Why |
-|----------|-----|
-| Random 80% sampling | Static dataset — sampling simulates data variability so promote/reject has purpose |
-| MultiOutput over 4 separate models | Single training run, consistent feature set, simpler deployment |
-| F1 macro comparison | Handles class imbalance (e.g., pump leakage has 3 unequal classes) |
-| Promote/reject in DAG | New model promoted to Production only if F1 > current Production model |
-| DAG delegates to `src/train.py` | Separation of concerns: DAG = orchestration, src/ = business logic |
-
-**MLflow integration:**
-- `src/train.py` logs params + metrics + artifact + JSON report to MLflow
-- DAG's `train_and_log()` registers model in MLflow Model Registry
-- `promote_or_reject()` compares new model F1 vs Production F1, promotes or archives
+> Bonjour, nous sommes Lina, Mohammed, Benjamin et Grégoire. Notre projet porte sur le monitoring de systèmes hydrauliques : un pipeline MLOps complet, de l'entraînement à la production.
 
 ---
 
-### Slide 4 — CI/CD Pipeline (45s)
+### Slide 2 — Contexte & Problématique (30s)
 
-**Content:**
-
-```
-PR / push
-   |
-   v
-CI: ruff + pytest (26 tests)
-   |
-   v (merge to main)
-CD: test -> build API + Webapp images -> push DockerHub -> deploy K8s
-```
-
-**Key points:**
-- **CI triggers on every PR + push to main** — catches regressions before merge
-- **CD triggers on push to main only** — test first, then build & push to GHCR + DockerHub
-- **K8s deploy is conditional** — check-deploy job verifies `KUBECONFIG` secret exists, deploy job skips gracefully if not
-- **Image tagging**: `latest` + `git short SHA` — enables rollback
-- **Dual registry**: GHCR (GitHub Packages) + DockerHub
-- **Package manager**: `uv` (faster than pip, lockfile for reproducibility)
-
-**Test coverage (26 tests):**
-| Suite | Count | What it tests |
-|-------|-------|---------------|
-| `test_dags.py` | 9 | DAG structure, task IDs, dependencies, schedules |
-| `test_model.py` | 7 | Model training, predictions, F1, feature/target validation |
-| `test_preprocessing.py` | 10 | Merge sensors, preprocess filtering, NaN handling, cross-module consistency |
+> Le cas d'usage, c'est de la maintenance prédictive industrielle. On utilise le dataset UCI "Condition Monitoring of Hydraulic Systems" : 2205 cycles de mesures, 17 capteurs, et 4 composants à diagnostiquer simultanément — refroidisseur, vanne, pompe et accumulateur.
+>
+> On a formulé le problème comme une classification multi-classe multi-output. Pourquoi pas de la détection d'anomalies ? Parce que les données sont labellisées via `profile.txt` — on peut donc faire un diagnostic précis par composant, ce qui est beaucoup plus actionnable qu'un simple « anomalie oui/non ». Et ça nous donne des métriques quantitatives pour la logique de Continuous Training.
 
 ---
 
-### Slide 5 — API + WebApp + Monitoring (1m)
+### Slide 3 — Vue d'ensemble de l'architecture (45s)
 
-**Content:**
-
-**API (FastAPI):**
-- `/predict` — POST with JSON body (Pydantic), 17 sensor values -> 4 component states
-- `/health` — readiness probe
-- Swagger auto-generated at `/docs`
-- Model loaded from `models/model.pkl` (trained by Airflow pipeline)
-
-**WebApp (Streamlit) — 2 tabs:**
-- **Tab 1 "Prediction"**: 17 sensor input fields -> calls API -> displays 4 predicted component states
-- **Tab 2 "Model evaluation"**: displays accuracy, precision, recall, F1, confusion matrices per target from `reports/model_metrics.json`
-
-**Monitoring (Prometheus + Grafana):**
-- Prometheus scrapes API `/metrics` (via prometheus-fastapi-instrumentator) + node-exporter (system metrics)
-- Grafana dashboard provisioned automatically (JSON + provisioning config)
-- Dashboard auto-provisioned on `docker-compose up`
-
-**Screenshot suggestions:**
-- [ ] Airflow UI showing both DAGs with task graph
-- [ ] MLflow UI showing experiment runs with F1 metrics
-- [ ] Swagger `/docs` page with Pydantic schema
-- [ ] Streamlit webapp — Tab 1 with prediction result
-- [ ] Streamlit webapp — Tab 2 with model evaluation metrics + confusion matrices
-- [ ] Grafana dashboard
-- [ ] GitHub Actions CI/CD green checks
-- [ ] GitHub PR with review + checks
+> Voici l'architecture globale. Tout tourne dans Docker Compose — 9 services lancés en un seul `docker compose up`, zéro installation manuelle.
+>
+> Le flux est le suivant : le dataset UCI est ingéré par un premier DAG Airflow, le `data_pipeline`, qui tourne quotidiennement. Il déclenche un second DAG, le `training_pipeline`, qui entraîne le modèle et le logue dans MLflow. Le modèle entraîné est servi par une API FastAPI, consommée par une webapp Streamlit à deux onglets. Côté observabilité, Prometheus scrape les métriques de l'API et Grafana les affiche dans un dashboard auto-provisionné.
+>
+> On a aussi des manifests Kubernetes prêts pour la production. Le pipeline CD est conditionnel : il vérifie la présence du secret `KUBECONFIG` avant de déployer. Pas de cluster pour un projet scolaire, mais le pipeline est prêt.
 
 ---
 
-### Slide 6 — Collaboration + Lessons Learned (45s)
+### Slide 4 — Pipeline ML & Continuous Training (1m)
 
-**Content:**
-
-**Team organization:**
-| Person | Scope | Key deliverables |
-|--------|-------|-------------------|
-| A | Data + ML | `src/train.py`, MLflow integration, metrics export |
-| B | Airflow + CT + CI | DAGs, CT logic, 26 tests, CI/CD quality, docs |
-| C | API + WebApp | FastAPI (Pydantic), Streamlit (2 tabs), model evaluation display |
-| D | Infra + DevOps | Docker Compose (9 services), K8s manifests, CD pipeline, monitoring |
-
-**Git workflow:**
-- Feature branches (`feature/`, `fix/`, `refactor/`)
-- PRs to `main` with CI checks (ruff + pytest must pass)
-- 20+ PRs merged, atomic commits, conventional commit messages
-- Copilot code reviews on PRs
-
-**Honest lessons / limitations:**
-- Dataset is static — CT pipeline is designed for production but trained on sampled data
-- No K8s cluster available — CD pipeline is ready but deploy step is skipped
-- API loads model from local file, not from MLflow Registry (acceptable for dev, would need change for prod)
-- Heavy imports in Airflow DAGs cause DagBag parsing timeouts — learned to defer imports inside task functions
-- Initial API/WebApp scaffold was for weather data (not hydraulic) — required full rewrite
+> Le modèle, c'est un `MultiOutputClassifier` avec un Random Forest en dessous. Pourquoi ? Un seul entraînement pour les 4 cibles, des features cohérentes, et un déploiement plus simple que 4 modèles séparés.
+>
+> Les résultats sont très bons : F1 macro de 1.0 sur le refroidisseur, 0.947 sur la vanne, 0.993 sur la pompe, et 0.990 sur l'accumulateur. On utilise le F1 macro pour la comparaison champion/challenger, parce qu'il gère bien le déséquilibre de classes.
+>
+> La logique de Continuous Training repose sur deux DAGs. Le `data_pipeline` tourne tous les jours : il télécharge le dataset, le dézippe, fusionne les 17 capteurs, prétraite, échantillonne 80% des données, puis déclenche le `training_pipeline`. Celui-ci entraîne le modèle — en déléguant à `src/train.py` pour séparer orchestration et logique métier — puis compare le F1 du nouveau modèle avec celui en production dans le MLflow Registry. Si le nouveau est meilleur, il est promu ; sinon, il est archivé.
+>
+> Pourquoi échantillonner 80% sur un dataset statique ? C'est pour simuler la variabilité des données : chaque run voit un échantillon différent, ce qui donne un sens à la comparaison champion/challenger.
 
 ---
 
-## Anticipated Q&A
+### Slide 5 — Intégration Continue (CI) (45s)
 
-### "Why supervised classification instead of anomaly detection?"
-The dataset comes with labeled conditions (`profile.txt`) for all 4 components. Supervised classification gives:
-- Actionable predictions per component (not just "anomaly yes/no")
-- Measurable metrics (F1 per target) for the promote/reject mechanism
-- More meaningful CT: we can compare new vs old model quantitatively
-
-### "Why random sampling on a static dataset?"
-The dataset is fixed (2205 cycles). Random 80% sampling at each `data_pipeline` run simulates data variability. This gives purpose to the promote/reject mechanism — different samples can yield different model performance, so the comparison is meaningful.
-
-### "How does the promote/reject mechanism work?"
-1. `train_and_log()` trains on sampled data, logs to MLflow, registers model in the Registry
-2. `promote_or_reject()` compares new model's mean F1 macro vs current Production model's F1
-3. If new F1 > production F1: promote to Production (archive old). Otherwise: archive new model.
-
-### "Why Airflow and not Prefect/Dagster?"
-Course requirement. But also appropriate: batch DAGs with clear dependencies, mature ecosystem, widely used in industry for data/ML pipelines.
-
-### "Why Docker Compose for dev instead of running services natively?"
-- 9 services with consistent configuration in one file
-- Reproducible across team members' machines
-- Same service names as production (Airflow, MLflow, API, etc.)
-- `docker-compose up` vs manually installing PostgreSQL + Airflow + MLflow + ...
-
-### "Why `uv` instead of `pip`?"
-- 10-100x faster dependency resolution
-- Lockfile (`uv.lock`) for reproducible builds
-- Drop-in replacement for pip/virtualenv
-- Native Python version management
-
-### "How do you handle model versioning / rollback?"
-MLflow Model Registry with stages: None -> Staging -> Production -> Archived. Old models stay in registry with their metrics. Rollback = transition previous version back to Production stage.
-
-### "What about data drift monitoring?"
-Not implemented (static dataset). In production: would add statistical tests (KS test, PSI) on incoming sensor distributions vs training distribution, with Airflow DAG triggering retraining on drift detection.
-
-### "What tests do you have?"
-26 tests in 3 suites:
-- DAG structure tests (no actual execution, just task graph validation)
-- Model tests (synthetic data, shape/class/F1 validation)
-- Preprocessing integration tests (merge, filter, NaN, cross-module consistency)
-All run in CI on every PR.
-
-### "Why not use MLflow's `mlflow.sklearn.log_model()` directly?"
-`src/train.py` uses `mlflow.log_artifact()` for the model pickle. The DAG's `train_and_log()` then registers it in the Model Registry via `mlflow.register_model()`. This separation lets the training script stay independent of the registry workflow.
-
-### "Why does the API load from a local file instead of MLflow Registry?"
-Pragmatic choice for dev: `models/model.pkl` is simpler to load at startup. In production, the API should load from MLflow Registry to get the latest promoted model. The DAG already manages the registry — the API just needs to be updated to query it.
-
-### "What are your model's performance results?"
-F1 macro per target: cooler=1.000, valve=0.947, pump=0.993, accumulator=0.990. These are on a 20% test split with stratified sampling. The model exports a detailed JSON report with confusion matrices and classification reports per target.
+> La CI se déclenche à chaque push et chaque pull request. Trois étapes : linting avec ruff, exécution des 26 tests avec pytest, et scan de vulnérabilités avec Trivy.
+>
+> Les 26 tests couvrent trois suites : 9 tests sur la structure des DAGs — task IDs, dépendances, schedules — 7 tests sur le modèle — entraînement, prédictions, validation du F1 — et 10 tests de preprocessing — fusion des capteurs, filtrage, gestion des NaN.
+>
+> Côté outils, on utilise `uv` comme gestionnaire de paquets — beaucoup plus rapide que pip, avec un lockfile pour la reproductibilité. On a aussi Dependabot activé pour les mises à jour de dépendances. Et la CI est une gate obligatoire : la branch protection empêche le merge si la CI est rouge.
+>
+> Le workflow Git, c'est feature branches vers main via PR, avec des conventional commits. On a plus de 30 PRs mergées sur le projet, avec des reviews Copilot.
 
 ---
 
-## Status Checklist (for screenshots / demo)
+### Slide 6 — API & WebApp (45s)
 
-- [ ] `docker-compose up` works with all services healthy
-- [ ] Airflow UI: both DAGs visible, task graph correct
-- [ ] MLflow UI: experiment with logged runs, metrics, artifacts
-- [ ] API `/docs` (Swagger) accessible with Pydantic schema visible
-- [ ] WebApp Tab 1: prediction form works end-to-end (17 sensors -> 4 states)
-- [ ] WebApp Tab 2: model evaluation metrics + confusion matrices displayed
-- [ ] Grafana: dashboard loads with metrics
-- [ ] GitHub: CI green on main, PRs with checks
-- [ ] GitHub: CD pipeline visible (even if K8s deploy skips)
+> L'API est en FastAPI. L'endpoint principal, c'est `POST /predict` : il reçoit les 17 valeurs capteurs validées par Pydantic, et retourne les 4 états des composants. On a aussi `/health` pour les sondes readiness K8s, `/metrics` pour le scraping Prometheus, et `/docs` pour le Swagger auto-généré. Pourquoi FastAPI ? Le typage natif, l'async, et Swagger inclus sans config.
+>
+> La webapp Streamlit a deux onglets. Le premier, c'est la prédiction : 17 sliders pour les capteurs, appel à l'API, et affichage du diagnostic des 4 composants. Le second onglet affiche l'évaluation du modèle : métriques par cible — F1, accuracy, precision, recall — matrices de confusion interactives, et rapports de classification complets. Tout vient du fichier `model_metrics.json` généré par `src/train.py` à chaque entraînement.
 
 ---
 
-## Open Issues to Address Before Presentation
+### Slide 7 — Déploiement (45s)
 
-| Priority | Issue | Owner | Status |
-|----------|-------|-------|--------|
-| P1 | `mlflow.db` committed to repo (612K SQLite binary) — needs `git rm --cached` | All | DONE |
-| P1 | Validate `docker-compose up` end-to-end (all services healthy) | All | TODO |
-| P1 | Take screenshots for slides | All | After E2E validation |
-| P2 | `webapp/app.py` hardcodes `API_URL=http://127.0.0.1:8000` — won't work in Docker | C | DONE |
-| P2 | No `/metrics` Prometheus endpoint in API | C | DONE |
-| P3 | Add `reports/` to .gitignore (generated files) | Any | DONE |
+> En développement et pour la démo, tout tourne dans Docker Compose — 9 services : Airflow avec scheduler, webserver et triggerer, PostgreSQL pour les métadonnées Airflow, le serveur MLflow, l'API FastAPI, la webapp Streamlit, Prometheus et Grafana. Un seul `docker compose up` et tout est lancé. Les images Docker sont optimisées : multi-stage build, `uv` pour les dépendances, `.dockerignore` pour réduire le contexte.
+>
+> Pour la production, on a des manifests Kubernetes prêts pour l'API et la webapp. Le déploiement est conditionnel : un job `check-deploy` dans le pipeline CD vérifie que le secret `KUBECONFIG` existe avant de lancer `kubectl apply`. Les images sont taguées avec `latest` plus le SHA du commit Git, ce qui permet un rollback immédiat.
+>
+> Le pipeline CD se déclenche à chaque push sur main : build des images Docker, push vers GHCR et DockerHub en double registry pour la redondance, puis check-deploy et potentiellement le déploiement K8s.
 
 ---
 
-## Slide Design Notes
+### Slide 8 — Monitoring & Alerting (45s)
 
-- **Keep slides visual** — architecture diagrams > text
-- **One key message per slide** — 6 min = ~1 min/slide
-- **Justify, don't describe** — "we chose X because Y" not "we used X"
-- **Show results** — the metrics table is impressive (F1 > 0.94 on all targets), put it on a slide
-- **Be honest about limitations** — evaluators appreciate awareness over pretending everything is perfect
-- **Code snippets only if asked** — no code on slides, explain concepts
-- **WebApp Tab 2 is a strong visual** — shows confusion matrices and classification reports, good for a screenshot
+> Côté monitoring, Prometheus scrape l'endpoint `/metrics` de l'API toutes les 15 secondes. On collecte le nombre de requêtes, la latence par endpoint, les erreurs HTTP et les compteurs de prédictions.
+>
+> Grafana affiche ces métriques dans un dashboard auto-provisionné — il se configure tout seul au `docker compose up`, zéro intervention manuelle. Les panels montrent le taux de requêtes, les percentiles de latence (p50, p95, p99), le taux d'erreurs et l'état des services. La datasource Prometheus est aussi configurée automatiquement.
+>
+> Pour l'alerting, on a mis en place des callbacks email dans Airflow. Quand un DAG échoue, le `on_failure_callback` envoie un email avec le nom du DAG, la task en erreur et la date. C'est configurable par DAG, avec le SMTP paramétrable dans `airflow.cfg`. C'est le bonus numéro 17 du barème.
 
 ---
 
-## Objectives Coverage (from course spec)
+### Slide 9 — Couverture des objectifs (30s)
 
-### Required Objectives (10/10 completed)
+> Pour conclure, on a couvert les 10 objectifs requis du barème : extraction et prétraitement des données, modèle ML, model registry MLflow, pipeline Airflow de réentraînement, experiment tracking, API FastAPI avec Swagger, webapp Streamlit à deux onglets, Continuous Training, Docker plus K8s plus CI/CD, et versionnage GitHub avec documentation.
+>
+> En bonus, on en a réalisé 3 sur 8 : le monitoring avec Prometheus et Grafana, le versionnage de modèle avec rollback via le MLflow Registry, et l'alerting email via les callbacks Airflow. Merci, on est disponibles pour vos questions.
 
-| # | Objective (from spec) | What we built | Where |
-|---|----------------------|---------------|-------|
-| 1 | Extract & preprocess data | UCI download, unzip, merge 17 sensors, filter unstable, dropna | `src/data_ingestion.py`, `src/preprocess.py`, DAG |
-| 2 | Build ML model | MultiOutputClassifier(RF), 4 targets, F1 > 0.94 | `src/train.py` |
-| 3 | Model registry | MLflow Model Registry with promote/reject stages | DAG `training_pipeline.py` |
-| 4 | Airflow retraining pipeline | 2 DAGs: data_pipeline (@daily) + training_pipeline (event-driven) | `airflow/dags/` |
-| 5 | MLflow tracking | Params, metrics (F1/accuracy/precision/recall), artifacts, JSON report | `src/train.py` |
-| 6 | API | FastAPI, Pydantic body, `/predict`, `/health`, `/metrics`, Swagger | `api/app.py` |
-| 7 | WebApp | Streamlit, 2 tabs (prediction + model evaluation with confusion matrices) | `webapp/app.py` |
-| 8 | Continuous Training (CT) | Random 80% sampling + champion/challenger F1 comparison + auto-promote | DAGs + `src/train.py` |
-| 9 | Docker + K8s + CI/CD | Docker Compose (9 services), K8s manifests, CI (pytest+ruff), CD (build GHCR+DH, deploy K8s) | `docker-compose.yml`, `k8s/`, `.github/workflows/` |
-| 10 | GitHub versioning & docs | 20+ PRs, conventional commits, README, model card, ORGANISATION.md | repo root + `docs/` |
+---
 
-### Bonus Objectives (3 completed)
+## Q&A anticipées (en français)
 
-| # | Bonus (from spec) | What we built | Where |
-|---|-------------------|---------------|-------|
-| 12 | Monitoring | Prometheus + Grafana + Node Exporter, API `/metrics` via instrumentator, dashboard auto-provisioned | `monitoring/`, `api/app.py` |
-| 14 | Model versioning / rollback | MLflow Registry stages (None -> Staging -> Production -> Archived), DAG manages transitions | DAG `promote_or_reject` |
-| 17 | Email alerting | `on_failure_callback` on all DAGs, SMTP alerting | `airflow/dags/callbacks.py` |
+### « Pourquoi classification supervisée plutôt que détection d'anomalies ? »
 
-### Bonus NOT done (and why)
+Le dataset est labellisé via `profile.txt` pour les 4 composants. La classification supervisée donne un diagnostic actionnable par composant — pas juste « anomalie oui/non ». Et on a des métriques quantitatives (F1 par cible) pour alimenter le mécanisme promote/reject du Continuous Training.
 
-| # | Bonus | Why not |
-|---|-------|---------|
-| 11 | Live data (streaming/API) | Dataset is static (UCI). Sampling simulates variability. |
-| 13 | Load testing (Locust) | Time constraint. Would be straightforward to add. |
-| 15 | Human in the loop | Not applicable to this use case (industrial sensors, no human labeling). |
-| 16 | API access management | Time constraint. Would add API keys or OAuth. |
+### « Pourquoi échantillonner aléatoirement 80% sur un dataset statique ? »
 
-### Evaluation Criteria Mapping
+Le dataset fait 2205 cycles et ne change pas. L'échantillonnage à 80% à chaque run du `data_pipeline` simule la variabilité des données. Ça donne un sens à la comparaison champion/challenger : des échantillons différents peuvent donner des performances différentes, donc la comparaison F1 est pertinente.
 
-| Criterion | Our evidence |
-|-----------|-------------|
-| **Code quality** | 26 tests (3 suites), ruff linting, type hints, modular src/, SOLID principles |
-| **Good AI usage** | Concise README, no superfluous code, Copilot used for reviews not blind generation |
-| **Airflow + CI/CD** | 2 DAGs with CT logic, CI on every PR, CD with dual registry + conditional K8s deploy |
-| **MLflow tracking** | Full experiment tracking, Model Registry, promote/reject, metrics export |
-| **API + WebApp** | FastAPI Swagger + Pydantic + 3 endpoints, Streamlit 2 tabs with confusion matrices |
-| **Architecture coherence** | Clear separation: src/ (business), airflow/ (orchestration), api/ (serving), webapp/ (UI) |
-| **GitHub collaboration** | 20+ PRs, 4 contributors, feature branches, CI gates, conventional commits |
+### « Comment fonctionne le mécanisme promote/reject ? »
+
+1. `train_and_log()` entraîne sur les données échantillonnées, logue dans MLflow, enregistre le modèle dans le Registry
+2. `promote_or_reject()` compare le F1 macro moyen du nouveau modèle vs celui du modèle en Production
+3. Si F1 nouveau > F1 production : promotion en Production, l'ancien est archivé. Sinon : le nouveau est archivé.
+
+### « Pourquoi Airflow et pas Prefect ou Dagster ? »
+
+C'est un requirement du cours. Mais c'est aussi un bon choix : DAGs avec dépendances claires, écosystème mature, très utilisé en industrie pour les pipelines batch data/ML.
+
+### « Pourquoi Docker Compose plutôt que de lancer les services nativement ? »
+
+9 services configurés de manière cohérente dans un seul fichier. Reproductible sur les machines de chaque membre de l'équipe. Les mêmes noms de services qu'en production. Un `docker compose up` vs installer manuellement PostgreSQL + Airflow + MLflow + ...
+
+### « Pourquoi `uv` plutôt que `pip` ? »
+
+10 à 100x plus rapide pour la résolution de dépendances. Lockfile (`uv.lock`) pour des builds reproductibles. Drop-in replacement pour pip/virtualenv. Gestion native des versions Python.
+
+### « Comment gérez-vous le versionnage / rollback des modèles ? »
+
+Via le MLflow Model Registry avec les stages : None → Staging → Production → Archived. Les anciens modèles restent dans le registry avec leurs métriques. Rollback = remettre la version précédente au stage Production.
+
+### « Et le drift monitoring ? »
+
+Pas implémenté — dataset statique. En production, on ajouterait des tests statistiques (KS test, PSI) sur les distributions des capteurs entrants vs les distributions d'entraînement, avec un DAG Airflow qui déclenche le réentraînement en cas de drift détecté.
+
+### « Quels tests avez-vous ? »
+
+26 tests en 3 suites : tests de structure des DAGs (pas d'exécution réelle, juste validation du graphe de tâches), tests du modèle (données synthétiques, validation shape/classes/F1), et tests de preprocessing (merge, filtre, NaN, cohérence cross-module). Tous lancés dans la CI à chaque PR.
+
+### « Pourquoi l'API charge un fichier local au lieu du MLflow Registry ? »
+
+Choix pragmatique pour le développement : `models/model.pkl` est plus simple à charger au démarrage. En production, l'API devrait charger depuis le MLflow Registry pour avoir le dernier modèle promu. Le DAG gère déjà le registry — il suffirait de modifier l'API pour l'interroger.
+
+### « Quelles sont les performances du modèle ? »
+
+F1 macro par cible : cooler = 1.000, valve = 0.947, pump = 0.993, accumulator = 0.990. C'est sur un split de test à 20% avec échantillonnage stratifié. Le modèle exporte un rapport JSON détaillé avec les matrices de confusion et rapports de classification par cible.
+
+### « Pourquoi pas de cluster K8s ? »
+
+Projet scolaire — pas de budget pour un cluster. Mais le pipeline CD est prêt : manifests K8s écrits, job `check-deploy` conditionnel au secret `KUBECONFIG`. En ajoutant le secret, le déploiement se fait automatiquement.
+
+### « Comment est séparé le code ? »
+
+Séparation des responsabilités : `src/` = logique métier (train, preprocess, ingestion), `airflow/dags/` = orchestration, `api/` = serving, `webapp/` = interface utilisateur. Le DAG délègue à `src/train.py`, il n'implémente pas la logique d'entraînement lui-même.
+
+---
+
+## Checklist avant la présentation
+
+- [ ] `docker compose up` fonctionne, tous les services healthy
+- [ ] Airflow UI : les 2 DAGs visibles, graphe des tâches correct
+- [ ] MLflow UI : expérience avec des runs loggés, métriques, artefacts
+- [ ] API `/docs` (Swagger) accessible avec le schéma Pydantic
+- [ ] WebApp onglet 1 : formulaire de prédiction fonctionne end-to-end
+- [ ] WebApp onglet 2 : métriques + matrices de confusion affichées
+- [ ] Grafana : dashboard avec les métriques
+- [ ] GitHub Actions : CI verte sur main
+- [ ] GitHub Actions : pipeline CD visible
+- [ ] Screenshots pris et insérés dans les backup slides
+- [ ] PDF compilé et envoyé à `prillard.martin@gmail.com`
