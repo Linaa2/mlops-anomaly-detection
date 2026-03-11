@@ -1,6 +1,7 @@
 # ============================================================
 # CD Pipeline — Build → Push GHCR → Deploy K8s
 # Trigger : push sur main
+# Images  : api, webapp, airflow, mlflow (4 images → GHCR)
 # ============================================================
 name: CD Pipeline
 
@@ -114,6 +115,18 @@ jobs:
           tags: |
             ghcr.io/${{ steps.meta.outputs.owner }}/mlops-airflow:latest
             ghcr.io/${{ steps.meta.outputs.owner }}/mlops-airflow:${{ steps.meta.outputs.version }}
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+
+      - name: Build & Push MLflow image
+        uses: docker/build-push-action@v5
+        with:
+          context: .
+          file: mlflow/Dockerfile
+          push: true
+          tags: |
+            ghcr.io/${{ steps.meta.outputs.owner }}/mlops-mlflow:latest
+            ghcr.io/${{ steps.meta.outputs.owner }}/mlops-mlflow:${{ steps.meta.outputs.version }}
           cache-from: type=gha
           cache-to: type=gha,mode=max
 
