@@ -217,12 +217,12 @@
   \end{column}
 
   \begin{column}{0.45\textwidth}
-    \textbf{Logique CT (2 DAGs) :}\\[4pt]
+    \textbf{Logique CT (2 DAGs) :}\\[2pt]
     \footnotesize
     \begin{tikzpicture}[
-      node distance=0.4cm,
-      task/.style={draw, rounded corners=3pt, minimum width=2.8cm, minimum height=0.5cm, font=\scriptsize, fill=tptblue!8, draw=tptblue!50},
-      arr/.style={-{Stealth[length=4pt]}, tptblue!60},
+      node distance=0.2cm,
+      task/.style={draw, rounded corners=2pt, minimum width=2.5cm, minimum height=0.38cm, font=\tiny, fill=tptblue!8, draw=tptblue!50, inner sep=2pt},
+      arr/.style={-{Stealth[length=3pt]}, tptblue!60},
     ]
       \node[task] (dl) {download\_dataset};
       \node[task, below=of dl] (uz) {unzip};
@@ -235,17 +235,17 @@
       \draw[arr] (mg)--(pp); \draw[arr] (pp)--(sa);
       \draw[arr] (sa)--(tr);
 
-      \node[task, right=0.6cm of sa, fill=warnor!10, draw=warnor!50] (tm) {train\_model};
+      \node[task, right=0.5cm of sa, fill=warnor!10, draw=warnor!50] (tm) {train\_model};
       \node[task, below=of tm, fill=warnor!10, draw=warnor!50] (pr) {promote\_or\_reject};
 
-      \draw[arr, warnor!60] (tr.east) -- ++(0.2,0) |- (tm.west);
+      \draw[arr, warnor!60] (tr.east) -- ++(0.15,0) |- (tm.west);
       \draw[arr, warnor!60] (tm)--(pr);
 
-      \node[font=\scriptsize\color{tptgray}, above=0.1cm of dl] {@daily};
-      \node[font=\scriptsize\color{tptgray}, above=0.1cm of tm] {event-driven};
+      \node[font=\tiny\color{tptgray}, above=0.05cm of dl] {@daily};
+      \node[font=\tiny\color{tptgray}, above=0.05cm of tm] {event-driven};
     \end{tikzpicture}
 
-    \vspace{6pt}
+    \vspace{4pt}
     {\scriptsize \textbf{Pourquoi \'echantillonner 80\% ?}\\
     Dataset statique $\to$ l'\'echantillonnage simule\\la variabilit\'e, rendant la comparaison\\champion/challenger pertinente.}
   \end{column}
@@ -261,21 +261,20 @@
 
 \begin{columns}[T]
   \begin{column}{0.48\textwidth}
-    \textbf{D\'eclench\'ee \`a chaque push \& PR}\\[6pt]
+    \textbf{D\'eclench\'ee \`a chaque push \& PR}\\[4pt]
     \begin{tikzpicture}[
-      node distance=0.35cm,
-      cibox/.style={draw, rounded corners=3pt, minimum width=3.5cm, minimum height=0.55cm, font=\small, fill=okgreen!8, draw=okgreen!50},
-      trivybox/.style={draw, rounded corners=3pt, minimum width=3.5cm, minimum height=0.55cm, font=\small, fill=red!8, draw=red!50},
-      arr/.style={-{Stealth[length=4pt]}, okgreen!60},
+      node distance=0.25cm,
+      cibox/.style={draw, rounded corners=2pt, minimum width=3.3cm, minimum height=0.45cm, font=\small, fill=okgreen!8, draw=okgreen!50, inner sep=2pt},
+      arr/.style={-{Stealth[length=3pt]}, okgreen!60},
     ]
       \node[cibox] (lint) {\faCheck\hspace{4pt}ruff check (linting)};
       \node[cibox, below=of lint] (test) {\faCheck\hspace{4pt}pytest (26 tests)};
-      \node[trivybox, below=of test] (trivy) {\faShieldAlt\hspace{4pt}Trivy (vuln\'erabilit\'es)};
+      \node[cibox, below=of test] (trivy) {\faCheck\hspace{4pt}Trivy (vuln\'erabilit\'es)};
       \draw[arr] (lint)--(test);
-      \draw[-{Stealth[length=4pt]}, thick, red!60] (test)--(trivy);
+      \draw[arr] (test)--(trivy);
     \end{tikzpicture}
 
-    \vspace{8pt}
+    \vspace{4pt}
     \textbf{26 tests en 3 suites :}
     \small
     \begin{tabular}{@{}lrp{3cm}@{}}
@@ -290,18 +289,18 @@
   \end{column}
 
   \begin{column}{0.48\textwidth}
-    \textbf{Outils \& pratiques :}\\[6pt]
+    \textbf{Outils \& pratiques :}\\[4pt]
     \small
-    \begin{itemize}\setlength\itemsep{4pt}
-      \item \textbf{Gestionnaire de paquets :} \texttt{uv}\\{\scriptsize Rapide, lockfile d\'eterministe, reproductible}
+    \begin{itemize}\setlength\itemsep{2pt}
+      \item \textbf{Gestionnaire :} \texttt{uv}\\{\scriptsize Rapide, lockfile d\'eterministe, reproductible}
       \item \textbf{Linting :} \texttt{ruff}\\{\scriptsize V\'erification PEP8 + import order}
       \item \textbf{S\'ecurit\'e :} Trivy + Dependabot\\{\scriptsize Scan vuln\'erabilit\'es images \& deps}
       \item \textbf{CI gate obligatoire}\\{\scriptsize Branch protection : merge bloqu\'e si CI rouge}
     \end{itemize}
 
-    \vspace{6pt}
+    \vspace{4pt}
     \textbf{Workflow Git :}
-    \begin{itemize}\small\setlength\itemsep{2pt}
+    \begin{itemize}\small\setlength\itemsep{1pt}
       \item Feature branches $\to$ PR $\to$ main
       \item Conventional commits
       \item 30+ PRs merg\'ees, reviews Copilot
@@ -360,50 +359,51 @@
 
 \begin{columns}[T]
   \begin{column}{0.48\textwidth}
-    \textbf{\faDocker\hspace{4pt}Docker Compose --- Dev / D\'emo}\\[6pt]
+    \textbf{\faDocker\hspace{4pt}Docker Compose --- Dev / D\'emo}\\[4pt]
     \small
     \textbf{9 services} en un seul \texttt{docker compose up} :
-    \begin{itemize}\setlength\itemsep{2pt}
+    \begin{itemize}\setlength\itemsep{1pt}
       \item Airflow (scheduler + webserver + triggerer)
       \item PostgreSQL (m\'etadonn\'ees Airflow)
       \item MLflow Tracking Server
       \item API FastAPI + WebApp Streamlit
       \item Prometheus + Grafana
     \end{itemize}
-    \vspace{4pt}
-    {\scriptsize\color{tptgray}\faArrowRight\hspace{4pt} Reproductibilit\'e totale : z\'ero installation manuelle}
+    \vspace{2pt}
+    {\scriptsize\color{tptgray}\faArrowRight\hspace{4pt} Reproductibilit\'e totale : z\'ero install manuelle}
 
-    \vspace{6pt}
+    \vspace{4pt}
     \textbf{Images Docker optimis\'ees :}\\
     {\scriptsize Multi-stage build, \texttt{uv} pour les deps,\\\texttt{.dockerignore} pour r\'eduire le contexte}
   \end{column}
 
   \begin{column}{0.48\textwidth}
-    \textbf{\faCloud\hspace{4pt}Kubernetes --- Production}\\[6pt]
+    \textbf{\faCloud\hspace{4pt}Kubernetes --- Production}\\[4pt]
     \small
-    \begin{itemize}\setlength\itemsep{3pt}
+    \begin{itemize}\setlength\itemsep{2pt}
       \item Manifests K8s pr\^ets (API + WebApp)
       \item D\'eploiement \textbf{conditionnel} :\\{\scriptsize Job \texttt{check-deploy} v\'erifie la pr\'esence\\du secret \texttt{KUBECONFIG} avant deploy}
       \item Tags images : \texttt{latest} + git SHA\\{\scriptsize $\to$ rollback imm\'ediat possible}
     \end{itemize}
 
-    \vspace{6pt}
-    \textbf{Pipeline CD} {\small (push sur main) :}\\[4pt]
+    \vspace{4pt}
+    \textbf{Pipeline CD} {\small (push sur main) :}\\[2pt]
     \footnotesize
     \begin{tikzpicture}[
-      node distance=0.3cm,
-      cdbox/.style={draw, rounded corners=3pt, minimum width=3.5cm, minimum height=0.5cm, font=\scriptsize, fill=tptlight!10, draw=tptlight!50},
-      arr/.style={-{Stealth[length=4pt]}, tptlight!60},
-      skipbox/.style={draw, rounded corners=3pt, minimum width=3.5cm, minimum height=0.5cm, font=\scriptsize, fill=tptgray!10, draw=tptgray!40, text=tptgray},
+      node distance=0.2cm,
+      cdbox/.style={draw, rounded corners=2pt, minimum width=3.2cm, minimum height=0.38cm, font=\tiny, fill=tptlight!10, draw=tptlight!50, inner sep=2pt},
+      arr/.style={-{Stealth[length=3pt]}, tptlight!60},
+      skipbox/.style={draw, rounded corners=2pt, minimum width=3.2cm, minimum height=0.38cm, font=\tiny, fill=tptgray!10, draw=tptgray!40, text=tptgray, inner sep=2pt},
     ]
       \node[cdbox] (build) {Build images Docker};
       \node[cdbox, below=of build] (push) {Push GHCR + DockerHub};
       \node[cdbox, below=of push] (check) {check-deploy (secret?)};
-      \node[skipbox, below=of check] (deploy) {\faForward\hspace{4pt}kubectl apply (skip)};
+      \node[skipbox, below=of check] (deploy) {\faForward\hspace{2pt}kubectl apply (skip)};
       \draw[arr] (build)--(push); \draw[arr] (push)--(check);
       \draw[arr, dashed, tptgray!60] (check)--(deploy);
     \end{tikzpicture}
 
+    \vspace{2pt}
     {\scriptsize\color{tptgray} Double registry : redondance GHCR + DockerHub}
   \end{column}
 \end{columns}
