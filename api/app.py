@@ -3,6 +3,7 @@ from pathlib import Path
 import joblib
 import pandas as pd
 from fastapi import FastAPI
+from prometheus_fastapi_instrumentator import Instrumentator
 from pydantic import BaseModel
 
 FEATURES = [
@@ -35,6 +36,9 @@ TARGETS = [
 MODEL_PATH = Path("models/model.pkl")
 
 app = FastAPI(title="Hydraulic Condition Prediction API")
+
+# Expose /metrics endpoint for Prometheus scraping
+Instrumentator().instrument(app).expose(app)
 
 
 class PredictionInput(BaseModel):
