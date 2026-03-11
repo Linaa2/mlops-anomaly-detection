@@ -254,25 +254,28 @@
 \end{frame}
 
 % ═══════════════════════════════════════════════════════════════
-% SLIDE 5 — Pipeline CI/CD (45s)
-% Justifier : pourquoi double registry, pourquoi K8s conditionnel, pourquoi uv
+% SLIDE 5 — Pipeline CI (45s)
+% Justifier : qualit\'e du code, tests, outils
 % ═══════════════════════════════════════════════════════════════
-\begin{frame}[fragile]{Pipeline CI/CD}
+\begin{frame}[fragile]{Int\'egration Continue (CI)}
 
 \begin{columns}[T]
   \begin{column}{0.48\textwidth}
-    \textbf{CI} {\small (chaque push \& PR)}\\[4pt]
+    \textbf{D\'eclench\'ee \`a chaque push \& PR}\\[6pt]
     \begin{tikzpicture}[
       node distance=0.35cm,
       cibox/.style={draw, rounded corners=3pt, minimum width=3.5cm, minimum height=0.55cm, font=\small, fill=okgreen!8, draw=okgreen!50},
+      trivybox/.style={draw, rounded corners=3pt, minimum width=3.5cm, minimum height=0.55cm, font=\small, fill=red!8, draw=red!50},
       arr/.style={-{Stealth[length=4pt]}, okgreen!60},
     ]
-      \node[cibox] (lint) {\faCheck\hspace{4pt}ruff check};
+      \node[cibox] (lint) {\faCheck\hspace{4pt}ruff check (linting)};
       \node[cibox, below=of lint] (test) {\faCheck\hspace{4pt}pytest (26 tests)};
+      \node[trivybox, below=of test] (trivy) {\faShieldAlt\hspace{4pt}Trivy (vuln\'erabilit\'es)};
       \draw[arr] (lint)--(test);
+      \draw[-{Stealth[length=4pt]}, thick, red!60] (test)--(trivy);
     \end{tikzpicture}
 
-    \vspace{6pt}
+    \vspace{8pt}
     \textbf{26 tests en 3 suites :}
     \small
     \begin{tabular}{@{}lrp{3cm}@{}}
@@ -287,129 +290,171 @@
   \end{column}
 
   \begin{column}{0.48\textwidth}
-    \textbf{CD} {\small (push sur main)}\\[4pt]
-    \begin{tikzpicture}[
-      node distance=0.35cm,
-      cdbox/.style={draw, rounded corners=3pt, minimum width=3.8cm, minimum height=0.55cm, font=\small, fill=tptlight!10, draw=tptlight!50},
-      arr/.style={-{Stealth[length=4pt]}, tptlight!60},
-      skipbox/.style={draw, rounded corners=3pt, minimum width=3.8cm, minimum height=0.55cm, font=\small, fill=tptgray!10, draw=tptgray!40, text=tptgray},
-    ]
-      \node[cdbox] (test) {Run tests};
-      \node[cdbox, below=of test] (build) {Build Docker images};
-      \node[cdbox, below=of build] (push) {Push GHCR + DockerHub};
-      \node[cdbox, below=of push] (check) {check-deploy (secrets?)};
-      \node[skipbox, below=of check] (deploy) {\faForward\hspace{4pt}Deploy K8s (skip)};
-      \draw[arr] (test)--(build); \draw[arr] (build)--(push);
-      \draw[arr] (push)--(check); \draw[arr, dashed, tptgray!60] (check)--(deploy);
-    \end{tikzpicture}
-
-    \vspace{4pt}
-    {\scriptsize \textbf{Double registry :} GHCR + DockerHub (redondance)}\\
-    {\scriptsize \textbf{Tags :} \texttt{latest} + git SHA $\to$ rollback possible}\\
-    {\scriptsize \textbf{Gestionnaire :} \texttt{uv} (rapide, lockfile, reproductible)}
-  \end{column}
-\end{columns}
-
-\end{frame}
-
-% ═══════════════════════════════════════════════════════════════
-% SLIDE 6 — API + WebApp + Monitoring (1m)
-% Justifier : pourquoi FastAPI, pourquoi 2 onglets, pourquoi Prometheus+Grafana
-% ═══════════════════════════════════════════════════════════════
-\begin{frame}{API, WebApp \& Monitoring}
-
-\begin{columns}[T]
-  \begin{column}{0.32\textwidth}
-    \textbf{\faServer\hspace{4pt}FastAPI}\\[4pt]
+    \textbf{Outils \& pratiques :}\\[6pt]
     \small
-    \begin{itemize}\setlength\itemsep{2pt}
-      \item \texttt{POST /predict}\\{\scriptsize Validation Pydantic\\17 capteurs $\to$ 4 \'etats}
-      \item \texttt{GET /health}\\{\scriptsize Sonde K8s readiness}
-      \item \texttt{GET /metrics}\\{\scriptsize Scraping Prometheus}
-      \item \texttt{GET /docs}\\{\scriptsize Swagger auto-g\'en\'er\'e}
+    \begin{itemize}\setlength\itemsep{4pt}
+      \item \textbf{Gestionnaire de paquets :} \texttt{uv}\\{\scriptsize Rapide, lockfile d\'eterministe, reproductible}
+      \item \textbf{Linting :} \texttt{ruff}\\{\scriptsize V\'erification PEP8 + import order}
+      \item \textbf{S\'ecurit\'e :} Trivy + Dependabot\\{\scriptsize Scan vuln\'erabilit\'es images \& deps}
+      \item \textbf{CI gate obligatoire}\\{\scriptsize Branch protection : merge bloqu\'e si CI rouge}
     \end{itemize}
-  \end{column}
-
-  \begin{column}{0.32\textwidth}
-    \textbf{\faDesktop\hspace{4pt}Streamlit}\\[4pt]
-    \small
-    \textbf{Onglet 1 --- Pr\'ediction}
-    \begin{itemize}\setlength\itemsep{1pt}
-      \item 17 champs capteurs
-      \item Appel API $\to$ 4 \'etats
-    \end{itemize}
-    \vspace{4pt}
-    \textbf{Onglet 2 --- \'Evaluation}
-    \begin{itemize}\setlength\itemsep{1pt}
-      \item M\'etriques par cible
-      \item Matrices de confusion
-      \item Rapports de classification
-    \end{itemize}
-    {\scriptsize\color{tptgray} Via \texttt{model\_metrics.json}}
-  \end{column}
-
-  \begin{column}{0.32\textwidth}
-    \textbf{\faChartBar\hspace{4pt}Monitoring}\\[4pt]
-    \small
-    \begin{itemize}\setlength\itemsep{2pt}
-      \item \textbf{Prometheus}\\{\scriptsize Scrape \texttt{/metrics}\\+ Node Exporter}
-      \item \textbf{Grafana}\\{\scriptsize Dashboard auto-provisionn\'e\\au \texttt{compose up}}
-      \item \textbf{Alerting}\\{\scriptsize Callbacks email Airflow\\en cas d'\'echec DAG}
-    \end{itemize}
-  \end{column}
-\end{columns}
-
-\vspace{6pt}
-\centering
-{\small\color{tptgray} \faArrowRight\hspace{4pt} Captures d'\'ecran dans les slides backup}
-
-\end{frame}
-
-% ═══════════════════════════════════════════════════════════════
-% SLIDE 7 — Collaboration & Le\c{c}ons apprises (45s)
-% Justifier : r\'epartition, workflow git, limites honn\^etes
-% ═══════════════════════════════════════════════════════════════
-\begin{frame}{Collaboration \& Le\c{c}ons apprises}
-
-\begin{columns}[T]
-  \begin{column}{0.48\textwidth}
-    \textbf{Organisation de l'\'equipe :}\\[4pt]
-    \small
-    \begin{tabular}{@{}lp{5cm}@{}}
-      \toprule
-      \textbf{Qui} & \textbf{P\'erim\`etre} \\
-      \midrule
-      Lina & Donn\'ees \& pipeline ML, MLflow \\
-      Gr\'egoire & Airflow, CT, CI/CD, tests, docs \\
-      Benjamin & API FastAPI, webapp Streamlit \\
-      Mohammed & Docker, K8s, CD, monitoring \\
-      \bottomrule
-    \end{tabular}
 
     \vspace{6pt}
     \textbf{Workflow Git :}
-    \begin{itemize}\small
+    \begin{itemize}\small\setlength\itemsep{2pt}
       \item Feature branches $\to$ PR $\to$ main
-      \item CI obligatoire sur chaque PR
-      \item 20+ PRs, conventional commits
-      \item Reviews Copilot
+      \item Conventional commits
+      \item 30+ PRs merg\'ees, reviews Copilot
     \end{itemize}
+  \end{column}
+\end{columns}
+
+\end{frame}
+
+% ═══════════════════════════════════════════════════════════════
+% SLIDE 6 — API & WebApp (45s)
+% Justifier : pourquoi FastAPI, pourquoi Pydantic, pourquoi 2 onglets Streamlit
+% ═══════════════════════════════════════════════════════════════
+\begin{frame}{API \& WebApp}
+
+\begin{columns}[T]
+  \begin{column}{0.48\textwidth}
+    \textbf{\faServer\hspace{4pt}FastAPI}\\[6pt]
+    \small
+    \begin{itemize}\setlength\itemsep{4pt}
+      \item \texttt{POST /predict}\\{\scriptsize Validation Pydantic : 17 capteurs $\to$ 4 \'etats}
+      \item \texttt{GET /health}\\{\scriptsize Sonde readiness pour K8s}
+      \item \texttt{GET /metrics}\\{\scriptsize Endpoint Prometheus (compteurs, latence)}
+      \item \texttt{GET /docs}\\{\scriptsize Swagger auto-g\'en\'er\'e}
+    \end{itemize}
+    \vspace{6pt}
+    {\scriptsize\color{tptgray}\faArrowRight\hspace{4pt} Pourquoi FastAPI ? Async, typage natif, Swagger inclus, \'ecosyst\`eme Pydantic}
   \end{column}
 
   \begin{column}{0.48\textwidth}
-    \textbf{Limites assum\'ees :}
-    \begin{itemize}\small\setlength\itemsep{3pt}
-      \item Dataset statique --- CT con\c{c}u pour la prod mais valid\'e sur donn\'ees \'echantillonn\'ees
-      \item Pas de cluster K8s --- pipeline CD pr\^et, deploy skip
-      \item API charge \texttt{model.pkl} localement\\{\scriptsize (en prod : requête au MLflow Registry)}
-      \item Imports lourds dans les DAGs $\to$ diff\'er\'es dans les fonctions (limite 30s parsing)
+    \textbf{\faDesktop\hspace{4pt}Streamlit --- 2 onglets}\\[6pt]
+    \small
+    \textbf{Onglet 1 --- Pr\'ediction}
+    \begin{itemize}\setlength\itemsep{2pt}
+      \item 17 champs capteurs (sliders)
+      \item Appel API $\to$ diagnostic 4 composants
+    \end{itemize}
+    \vspace{6pt}
+    \textbf{Onglet 2 --- \'Evaluation du mod\`ele}
+    \begin{itemize}\setlength\itemsep{2pt}
+      \item M\'etriques par cible (F1, accuracy, precision, recall)
+      \item Matrices de confusion interactives
+      \item Rapports de classification complets
+    \end{itemize}
+    {\scriptsize\color{tptgray} Source : \texttt{reports/model\_metrics.json}\\g\'en\'er\'e par \texttt{src/train.py} \`a chaque entra\^inement}
+  \end{column}
+\end{columns}
+
+\end{frame}
+
+% ═══════════════════════════════════════════════════════════════
+% SLIDE 7 — D\'eploiement (45s)
+% Docker Compose (dev), K8s (prod), pipeline CD
+% ═══════════════════════════════════════════════════════════════
+\begin{frame}[fragile]{D\'eploiement}
+
+\begin{columns}[T]
+  \begin{column}{0.48\textwidth}
+    \textbf{\faDocker\hspace{4pt}Docker Compose --- Dev / D\'emo}\\[6pt]
+    \small
+    \textbf{9 services} en un seul \texttt{docker compose up} :
+    \begin{itemize}\setlength\itemsep{2pt}
+      \item Airflow (scheduler + webserver + triggerer)
+      \item PostgreSQL (m\'etadonn\'ees Airflow)
+      \item MLflow Tracking Server
+      \item API FastAPI + WebApp Streamlit
+      \item Prometheus + Grafana
+    \end{itemize}
+    \vspace{4pt}
+    {\scriptsize\color{tptgray}\faArrowRight\hspace{4pt} Reproductibilit\'e totale : z\'ero installation manuelle}
+
+    \vspace{6pt}
+    \textbf{Images Docker optimis\'ees :}\\
+    {\scriptsize Multi-stage build, \texttt{uv} pour les deps,\\\texttt{.dockerignore} pour r\'eduire le contexte}
+  \end{column}
+
+  \begin{column}{0.48\textwidth}
+    \textbf{\faCloud\hspace{4pt}Kubernetes --- Production}\\[6pt]
+    \small
+    \begin{itemize}\setlength\itemsep{3pt}
+      \item Manifests K8s pr\^ets (API + WebApp)
+      \item D\'eploiement \textbf{conditionnel} :\\{\scriptsize Job \texttt{check-deploy} v\'erifie la pr\'esence\\du secret \texttt{KUBECONFIG} avant deploy}
+      \item Tags images : \texttt{latest} + git SHA\\{\scriptsize $\to$ rollback imm\'ediat possible}
     \end{itemize}
 
+    \vspace{6pt}
+    \textbf{Pipeline CD} {\small (push sur main) :}\\[4pt]
+    \footnotesize
+    \begin{tikzpicture}[
+      node distance=0.3cm,
+      cdbox/.style={draw, rounded corners=3pt, minimum width=3.5cm, minimum height=0.5cm, font=\scriptsize, fill=tptlight!10, draw=tptlight!50},
+      arr/.style={-{Stealth[length=4pt]}, tptlight!60},
+      skipbox/.style={draw, rounded corners=3pt, minimum width=3.5cm, minimum height=0.5cm, font=\scriptsize, fill=tptgray!10, draw=tptgray!40, text=tptgray},
+    ]
+      \node[cdbox] (build) {Build images Docker};
+      \node[cdbox, below=of build] (push) {Push GHCR + DockerHub};
+      \node[cdbox, below=of push] (check) {check-deploy (secret?)};
+      \node[skipbox, below=of check] (deploy) {\faForward\hspace{4pt}kubectl apply (skip)};
+      \draw[arr] (build)--(push); \draw[arr] (push)--(check);
+      \draw[arr, dashed, tptgray!60] (check)--(deploy);
+    \end{tikzpicture}
+
+    {\scriptsize\color{tptgray} Double registry : redondance GHCR + DockerHub}
+  \end{column}
+\end{columns}
+
+\end{frame}
+
+% ═══════════════════════════════════════════════════════════════
+% SLIDE 8 — Monitoring & Alerting (45s)
+% Prometheus + Grafana + Airflow callbacks
+% ═══════════════════════════════════════════════════════════════
+\begin{frame}{Monitoring \& Alerting}
+
+\begin{columns}[T]
+  \begin{column}{0.32\textwidth}
+    \textbf{\faChartLine\hspace{4pt}Prometheus}\\[6pt]
+    \small
+    \begin{itemize}\setlength\itemsep{3pt}
+      \item Scrape endpoint \texttt{/metrics} de l'API
+      \item M\'etriques collect\'ees :\\
+        {\scriptsize --- Nombre de requ\^etes\\--- Latence par endpoint\\--- Erreurs HTTP\\--- Compteurs de pr\'edictions}
+      \item Intervalle : 15s
+    \end{itemize}
+  \end{column}
+
+  \begin{column}{0.32\textwidth}
+    \textbf{\faChartBar\hspace{4pt}Grafana}\\[6pt]
+    \small
+    \begin{itemize}\setlength\itemsep{3pt}
+      \item Dashboard \textbf{auto-provisionn\'e}\\{\scriptsize Au \texttt{compose up}, z\'ero\\config manuelle}
+      \item Panels :
+        {\scriptsize\begin{itemize}\setlength\itemsep{1pt}
+          \item Taux de requ\^etes
+          \item Latence p50/p95/p99
+          \item Taux d'erreurs
+          \item \'Etat des services
+        \end{itemize}}
+      \item Datasource Prometheus\\{\scriptsize automatiquement configur\'ee}
+    \end{itemize}
+  \end{column}
+
+  \begin{column}{0.32\textwidth}
+    \textbf{\faBell\hspace{4pt}Alerting}\\[6pt]
+    \small
+    \begin{itemize}\setlength\itemsep{3pt}
+      \item \textbf{Airflow callbacks}\\{\scriptsize Notification email en cas\\d'\'echec d'un DAG}
+      \item M\'ecanisme :\\
+        {\scriptsize \texttt{on\_failure\_callback}\\appelle \texttt{failure\_callback()}\\$\to$ email avec DAG, task, date}
+      \item Configurable par DAG\\{\scriptsize SMTP param\'etrable dans\\\texttt{airflow.cfg}}
+    \end{itemize}
     \vspace{4pt}
-    \textbf{Principe cl\'e de conception :}\\
-    {\small S\'eparation des responsabilit\'es :\\
-    \texttt{src/} = logique m\'etier, \texttt{dags/} = orchestration,\\
-    \texttt{api/} = serving, \texttt{webapp/} = IHM}
+    {\scriptsize\color{tptgray}\faArrowRight\hspace{4pt} Bonus barème \#17}
   \end{column}
 \end{columns}
 
@@ -583,6 +628,53 @@
       \screenshot{github-cd}{Pipeline CD\\(build + push + check-deploy)}
     \end{column}
   \end{columns}
+\end{frame}
+
+% ── BACKUP 5 : Collaboration & Le\c{c}ons apprises ──────────────
+\begin{frame}{Backup --- Collaboration \& Le\c{c}ons apprises}
+
+\begin{columns}[T]
+  \begin{column}{0.48\textwidth}
+    \textbf{Organisation de l'\'equipe :}\\[4pt]
+    \small
+    \begin{tabular}{@{}lp{5cm}@{}}
+      \toprule
+      \textbf{Qui} & \textbf{P\'erim\`etre} \\
+      \midrule
+      Lina & Donn\'ees \& pipeline ML, MLflow \\
+      Gr\'egoire & Airflow, CT, CI/CD, tests, docs \\
+      Benjamin & API FastAPI, webapp Streamlit \\
+      Mohammed & Docker, K8s, CD, monitoring \\
+      \bottomrule
+    \end{tabular}
+
+    \vspace{6pt}
+    \textbf{Workflow Git :}
+    \begin{itemize}\small
+      \item Feature branches $\to$ PR $\to$ main
+      \item CI obligatoire sur chaque PR
+      \item 20+ PRs, conventional commits
+      \item Reviews Copilot
+    \end{itemize}
+  \end{column}
+
+  \begin{column}{0.48\textwidth}
+    \textbf{Limites assum\'ees :}
+    \begin{itemize}\small\setlength\itemsep{3pt}
+      \item Dataset statique --- CT con\c{c}u pour la prod mais valid\'e sur donn\'ees \'echantillonn\'ees
+      \item Pas de cluster K8s --- pipeline CD pr\^et, deploy skip
+      \item API charge \texttt{model.pkl} localement\\{\scriptsize (en prod : requ\^ete au MLflow Registry)}
+      \item Imports lourds dans les DAGs $\to$ diff\'er\'es dans les fonctions (limite 30s parsing)
+    \end{itemize}
+
+    \vspace{4pt}
+    \textbf{Principe cl\'e de conception :}\\
+    {\small S\'eparation des responsabilit\'es :\\
+    \texttt{src/} = logique m\'etier, \texttt{dags/} = orchestration,\\
+    \texttt{api/} = serving, \texttt{webapp/} = IHM}
+  \end{column}
+\end{columns}
+
 \end{frame}
 
 \end{document}
