@@ -38,3 +38,15 @@ reports/
 .coverage
 htmlcov/
 .pytest_cache/
+
+# LaTeX build artifacts
+docs/*.aux
+docs/*.log
+docs/*.nav
+docs/*.out
+docs/*.snm
+docs/*.toc
+docs/*.vrb
+
+# macOS
+.DS_Store
