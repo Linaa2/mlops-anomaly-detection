@@ -1,11 +1,13 @@
 import json
+import os
 from pathlib import Path
 
 import pandas as pd
 import requests
 import streamlit as st
 
-API_URL = "http://127.0.0.1:8000/predict"
+API_BASE = os.getenv("API_URL", "http://api:8000")
+API_URL = f"{API_BASE}/predict"
 METRICS_PATH = Path("reports/model_metrics.json")
 
 FEATURES = [
