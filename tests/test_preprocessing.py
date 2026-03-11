@@ -12,14 +12,12 @@ from unittest.mock import patch
 
 import numpy as np
 import pandas as pd
-import pytest
 
 # Ensure project root is importable
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), ".."))
 
 from src.data_ingestion import PROFILE_COLS, SENSORS, load_profile, merge_sensors
 from src.preprocess import TARGETS, preprocess
-
 
 # ---------------------------------------------------------------------------
 # Helpers
@@ -250,5 +248,6 @@ class TestPipelineConsistency:
         from src.train import FEATURES
 
         assert FEATURES == INGEST_SENSORS, (
-            f"Feature/sensor mismatch: train.FEATURES={FEATURES}, ingestion.SENSORS={INGEST_SENSORS}"
+            f"Feature/sensor mismatch: "
+            f"train.FEATURES={FEATURES}, ingestion.SENSORS={INGEST_SENSORS}"
         )
