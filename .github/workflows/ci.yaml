@@ -25,6 +25,8 @@ jobs:
         run: uv sync --dev
 
       - name: Run tests
+        env:
+          MLFLOW_TRACKING_URI: ./mlruns
         run: uv run pytest
 
       - name: Lint with Ruff
