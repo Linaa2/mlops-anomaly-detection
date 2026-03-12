@@ -115,18 +115,22 @@ flowchart TD
 
 | Service | Port | Rôle |
 |---------|------|------|
-| Airflow (webserver + scheduler + init) | 8080 | Orchestration (admin/admin) |
+| PostgreSQL | — | Backend metadata Airflow + MLflow |
 | MLflow | 5000 | Experiment tracking & model registry |
+| Airflow (webserver + scheduler + init) | 8080 | Orchestration (admin/admin) |
 | FastAPI | 8000 | API de prédiction (`/predict`, `/health`, `/metrics`) |
 | Streamlit | 8501 | Interface utilisateur (prédiction + évaluation) |
 | Prometheus | 9090 | Collecte de métriques |
 | Grafana | 3000 | Dashboards auto-provisionnés (admin/admin) |
-| PostgreSQL | 5432 | Backend metadata Airflow |
 | Node Exporter | 9100 | Métriques système |
+
+> **10 conteneurs** au total (PostgreSQL, MLflow, Airflow init + webserver + scheduler, FastAPI, Streamlit, Prometheus, Grafana, Node Exporter).
 
 ---
 
 ## 🚀 Démarrage rapide
+
+### Développement
 
 ```bash
 # Cloner et installer
@@ -141,17 +145,28 @@ uv run pytest tests/ -v
 uv run ruff check .
 
 # Lancer l'environnement dev (tous les services)
+cp envs/.env.example envs/.env.dev
 docker compose up --build
 
 # Arrêter
 docker compose down
 ```
 
-**Variables d'environnement** — copier et adapter :
+### Production
+
 ```bash
-cp envs/.env.example envs/.env.dev
-# Modifier MLFLOW_TRACKING_URI selon l'environnement
+# Configurer les variables d'environnement
+cp envs/.env.prod.example envs/.env.prod
+# Modifier les mots de passe et clés dans envs/.env.prod
+
+# Lancer la stack production (images pré-construites depuis GHCR)
+docker compose -f docker-compose.prod.yml --env-file envs/.env.prod up -d
+
+# Vérifier le statut
+docker compose -f docker-compose.prod.yml --env-file envs/.env.prod ps
 ```
+
+La stack production utilise des images Docker pré-construites (poussées par le pipeline CD), des volumes nommés, des limites de mémoire, et aucun port interne exposé inutilement.
 
 ---
 
@@ -163,7 +178,7 @@ cp envs/.env.example envs/.env.dev
 
 **CD** (`.github/workflows/cd.yml`) — déclenché sur push `main` :
 1. Tests complets
-2. Build & push images Docker → GHCR + DockerHub (`api` + `webapp`), tags `latest` + git SHA
+2. Build & push 4 images Docker → GHCR + DockerHub (`api`, `webapp`, `airflow`, `mlflow`), tags `latest` + git SHA
 3. Déploiement Kubernetes (conditionnel : ignoré si secret `KUBECONFIG` absent)
 
 **Docs** (`.github/workflows/docs.yml`) — build Sphinx + déploiement GitHub Pages automatique.
@@ -223,16 +238,20 @@ mlops-anomaly-detection/
 ├── .github/
 │   ├── workflows/
 │   │   ├── ci.yaml              # CI : pytest + ruff + sécurité
-│   │   ├── cd.yml               # CD : build GHCR+DockerHub + deploy K8s
+│   │   ├── cd.yml               # CD : build 4 images GHCR+DockerHub + deploy K8s
 │   │   └── docs.yml             # Docs : Sphinx → GitHub Pages
 │   └── dependabot.yml           # Mises à jour automatiques
-├── airflow/dags/
-│   ├── callbacks.py             # Alerting email sur échec (bonus)
-│   ├── data_pipeline.py         # DAG : ingestion + prétraitement + sampling
-│   └── training_pipeline.py     # DAG : entraînement + MLflow register + promote/reject
+├── airflow/
+│   ├── Dockerfile               # Image Airflow custom (DAGs + src baked-in)
+│   └── dags/
+│       ├── callbacks.py             # Alerting email sur échec (bonus)
+│       ├── data_pipeline.py         # DAG : ingestion + prétraitement + sampling
+│       └── training_pipeline.py     # DAG : entraînement + MLflow register + promote/reject
 ├── api/
 │   ├── Dockerfile
 │   └── app.py                   # FastAPI prediction service + Prometheus /metrics
+├── mlflow/
+│   └── Dockerfile               # Image MLflow custom (boto3 + psycopg2 pre-installed)
 ├── webapp/
 │   ├── Dockerfile
 │   └── app.py                   # Streamlit UI (prédiction + évaluation modèle)
@@ -240,6 +259,9 @@ mlops-anomaly-detection/
 │   ├── data_ingestion.py        # Téléchargement UCI + unzip + fusion capteurs
 │   ├── preprocess.py            # Filtrage, nettoyage, features + targets
 │   └── train.py                 # MultiOutput RF + MLflow tracking + export JSON
+├── docker/
+│   └── postgres/
+│       └── init-databases.sh    # Initialisation BDD mlflow au premier démarrage
 ├── k8s/
 │   ├── api-deployment.yaml
 │   └── webapp-deployment.yaml
@@ -255,8 +277,10 @@ mlops-anomaly-detection/
 │   ├── model_card.md            # Model card (usage, limites, éthique)
 │   └── ml_pipeline.md          # Conception du pipeline ML
 ├── envs/
-│   └── .env.example             # Template variables d'environnement
-├── docker-compose.yml           # Environnement dev (8 services)
+│   ├── .env.example             # Template variables (dev)
+│   └── .env.prod.example        # Template variables (prod — mots de passe CHANGE_ME)
+├── docker-compose.yml           # Environnement dev (10 conteneurs)
+├── docker-compose.prod.yml      # Environnement prod (images GHCR, volumes nommés, hardened)
 ├── pyproject.toml               # Dépendances (uv)
 └── ORGANISATION.md              # Plan & suivi des tâches
 ```
@@ -277,7 +301,7 @@ mlops-anomaly-detection/
 | 6 | API | ✅ FastAPI, Pydantic, Swagger, `/predict`, `/health`, `/metrics` |
 | 7 | WebApp | ✅ Streamlit, 2 onglets (prédiction + évaluation modèle) |
 | 8 | Entraînement continu | ✅ sampling quotidien + comparaison champion/challenger F1 |
-| 9 | Docker + K8s + CI/CD | ✅ Docker Compose (8 services), K8s manifests, GitHub Actions |
+| 9 | Docker + K8s + CI/CD | ✅ Docker Compose (10 conteneurs), K8s manifests, GitHub Actions |
 | 10 | Versioning GitHub & docs | ✅ 20+ PRs, commits conventionnels, README, model card |
 | **12** | **Monitoring (bonus)** | ✅ Prometheus + Grafana + Node Exporter + dashboard auto-provisionné |
 | **14** | **Versioning modèle/rollback (bonus)** | ✅ MLflow Registry stages (None → Production → Archived) |
@@ -289,10 +313,10 @@ mlops-anomaly-detection/
 
 | Membre | Périmètre |
 |--------|-----------|
-| A | Pipeline data & ML (`src/train.py`, intégration MLflow, export métriques) |
-| B | DAGs Airflow, entraînement continu, CI/CD, tests (26), alerting, docs |
-| C | API FastAPI (Pydantic), webapp Streamlit (2 onglets) |
-| D | Docker Compose (8 services), K8s manifests, pipeline CD, monitoring |
+| Lina Rhiati Hazime | Pipeline data & ML (`src/train.py`, intégration MLflow, export métriques) |
+| Grégoire Petit | DAGs Airflow, entraînement continu, CI/CD, tests (26), alerting, docs, déploiement prod |
+| Mohammed Horache | API FastAPI (Pydantic), webapp Streamlit (2 onglets) |
+| Benjamin Lepourtois | Docker Compose (10 conteneurs), K8s manifests, pipeline CD, monitoring |
 
 Voir `ORGANISATION.md` pour le suivi détaillé des tâches.
 

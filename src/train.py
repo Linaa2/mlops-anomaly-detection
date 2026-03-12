@@ -3,7 +3,6 @@ import os
 from pathlib import Path
 
 import joblib
-import mlflow
 import pandas as pd
 from sklearn.ensemble import RandomForestClassifier
 from sklearn.metrics import (
@@ -16,6 +15,8 @@ from sklearn.metrics import (
 )
 from sklearn.model_selection import train_test_split
 from sklearn.multioutput import MultiOutputClassifier
+
+import mlflow
 
 INPUT_PATH = os.getenv("INPUT_PATH", "data/processed/hydraulic_clean.csv")
 MODEL_PATH = os.getenv("MODEL_PATH", "models/model.pkl")

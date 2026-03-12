@@ -49,9 +49,10 @@ def _compute_f1_macro(run) -> float:
 
 def _get_production_f1() -> float | None:
     """Return the mean F1 of the current Production model, or None if absent."""
-    import mlflow
     from mlflow.exceptions import MlflowException
     from mlflow.tracking import MlflowClient
+
+    import mlflow
 
     mlflow.set_tracking_uri(MLFLOW_TRACKING_URI)
     client = MlflowClient()
@@ -77,8 +78,9 @@ def train_and_log(**context) -> str:
     This task adds: Model Registry registration (needed for promote/reject).
     Returns the run_id via XCom.
     """
-    import mlflow
     from mlflow.tracking import MlflowClient
+
+    import mlflow
 
     mlflow.set_tracking_uri(MLFLOW_TRACKING_URI)
 
@@ -123,8 +125,9 @@ def train_and_log(**context) -> str:
 
 def promote_or_reject(**context) -> None:
     """Compare new model F1 vs Production. Promote if better, archive otherwise."""
-    import mlflow
     from mlflow.tracking import MlflowClient
+
+    import mlflow
 
     mlflow.set_tracking_uri(MLFLOW_TRACKING_URI)
     client = MlflowClient()

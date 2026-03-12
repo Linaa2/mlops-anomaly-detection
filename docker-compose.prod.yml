@@ -1,0 +1,283 @@
+# ============================================================
+# PRODUCTION — Docker Compose
+# Services : Airflow, MLflow, FastAPI, Streamlit, Monitoring
+#
+# Usage : docker compose -f docker-compose.prod.yml --env-file envs/.env.prod up -d
+#
+# Pre-built images from GHCR (pushed by CD pipeline on main).
+# No bind-mounts, no hot-reload, no exposed internal ports.
+# ============================================================
+
+x-logging: &default-logging
+  driver: json-file
+  options:
+    max-size: "10m"
+    max-file: "3"
+
+x-airflow-common: &airflow-common
+  image: ghcr.io/linaa2/mlops-airflow:${IMAGE_TAG:-latest}
+  env_file:
+    - envs/.env.prod
+  environment:
+    AIRFLOW__CORE__EXECUTOR: LocalExecutor
+    AIRFLOW__DATABASE__SQL_ALCHEMY_CONN: >-
+      postgresql+psycopg2://${POSTGRES_USER}:${POSTGRES_PASSWORD}@postgres/${POSTGRES_DB}
+    AIRFLOW__CORE__FERNET_KEY: ${AIRFLOW_FERNET_KEY}
+    AIRFLOW__CORE__DAGS_ARE_PAUSED_AT_CREATION: "false"
+    AIRFLOW__CORE__LOAD_EXAMPLES: "false"
+    AIRFLOW__API__AUTH_BACKENDS: "airflow.api.auth.backend.session,airflow.api.auth.backend.basic_auth"
+    AIRFLOW__WEBSERVER__EXPOSE_CONFIG: "false"
+    AIRFLOW__WEBSERVER__WARN_DEPLOYMENT_EXPOSURE: "false"
+    PYTHONPATH: /opt/airflow
+    MLFLOW_TRACKING_URI: http://mlflow:5000
+  volumes:
+    - airflow_logs:/opt/airflow/logs
+    - airflow_data:/opt/airflow/data
+    - airflow_models:/opt/airflow/models
+    - airflow_reports:/opt/airflow/reports
+  depends_on:
+    postgres:
+      condition: service_healthy
+  logging: *default-logging
+
+services:
+
+  # ── PostgreSQL (Airflow + MLflow backend) ───────────────────
+  postgres:
+    image: postgres:15
+    env_file:
+      - envs/.env.prod
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+      POSTGRES_DB: ${POSTGRES_DB}
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+      - ./docker/postgres/init-databases.sh:/docker-entrypoint-initdb.d/init-databases.sh:ro
+    healthcheck:
+      test: ["CMD", "pg_isready", "-U", "${POSTGRES_USER}"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 30s
+    deploy:
+      resources:
+        limits:
+          memory: 512M
+    restart: always
+    logging: *default-logging
+    # No port exposed — internal only
+
+  # ── MLflow Tracking Server ─────────────────────────────────
+  mlflow:
+    image: ghcr.io/linaa2/mlops-mlflow:${IMAGE_TAG:-latest}
+    command:
+      - mlflow
+      - server
+      - --backend-store-uri
+      - postgresql+psycopg2://${POSTGRES_USER}:${POSTGRES_PASSWORD}@postgres/${MLFLOW_DB:-mlflow}
+      - --artifacts-destination
+      - s3://${MINIO_BUCKET}/mlflow
+      - --serve-artifacts
+      - --host
+      - "0.0.0.0"
+      - --port
+      - "5000"
+    env_file:
+      - envs/.env.prod
+    environment:
+      MLFLOW_S3_ENDPOINT_URL: ${MINIO_ENDPOINT_URL}
+      AWS_ACCESS_KEY_ID: ${MINIO_ACCESS_KEY}
+      AWS_SECRET_ACCESS_KEY: ${MINIO_SECRET_KEY}
+    volumes:
+      - mlflow_data:/mlflow
+    healthcheck:
+      test: ["CMD-SHELL", "python -c \"import urllib.request; urllib.request.urlopen('http://localhost:5000/health')\""]
+      interval: 30s
+      timeout: 10s
+      retries: 5
+      start_period: 60s
+    depends_on:
+      postgres:
+        condition: service_healthy
+    deploy:
+      resources:
+        limits:
+          memory: 1G
+    restart: always
+    logging: *default-logging
+    # No port exposed — internal only
+
+  # ── Airflow Init ───────────────────────────────────────────
+  airflow-init:
+    <<: *airflow-common
+    entrypoint: /bin/bash
+    command:
+      - -c
+      - |
+        airflow db migrate &&
+        airflow users create \
+          --username ${AIRFLOW_ADMIN_USER} \
+          --password ${AIRFLOW_ADMIN_PASSWORD} \
+          --firstname Admin --lastname Admin \
+          --role Admin --email admin@example.com || true
+    restart: on-failure
+    deploy:
+      resources:
+        limits:
+          memory: 512M
+    logging: *default-logging
+
+  # ── Airflow Webserver ──────────────────────────────────────
+  airflow-webserver:
+    <<: *airflow-common
+    command: webserver
+    healthcheck:
+      test: ["CMD", "curl", "--fail", "http://localhost:8080/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 5
+      start_period: 60s
+    depends_on:
+      postgres:
+        condition: service_healthy
+      airflow-init:
+        condition: service_completed_successfully
+    deploy:
+      resources:
+        limits:
+          memory: 1G
+    restart: always
+    # No port exposed — internal only (use SSH tunnel if needed)
+
+  # ── Airflow Scheduler ──────────────────────────────────────
+  airflow-scheduler:
+    <<: *airflow-common
+    command: scheduler
+    depends_on:
+      postgres:
+        condition: service_healthy
+      airflow-init:
+        condition: service_completed_successfully
+    deploy:
+      resources:
+        limits:
+          memory: 1G
+    restart: always
+
+  # ── FastAPI ────────────────────────────────────────────────
+  api:
+    image: ghcr.io/linaa2/mlops-api:${IMAGE_TAG:-latest}
+    env_file:
+      - envs/.env.prod
+    environment:
+      MLFLOW_TRACKING_URI: http://mlflow:5000
+      MLFLOW_MODEL_NAME: ${MLFLOW_MODEL_NAME:-hydraulic-anomaly-detector}
+      ENV: production
+      PYTHONUNBUFFERED: "1"
+      METRICS_PATH: /app/reports/model_metrics.json
+    ports:
+      - "8000:8000"
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8000/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 5
+      start_period: 30s
+    depends_on:
+      mlflow:
+        condition: service_healthy
+    deploy:
+      resources:
+        limits:
+          memory: 512M
+    restart: always
+    logging: *default-logging
+
+  # ── Streamlit ──────────────────────────────────────────────
+  webapp:
+    image: ghcr.io/linaa2/mlops-webapp:${IMAGE_TAG:-latest}
+    env_file:
+      - envs/.env.prod
+    environment:
+      API_URL: http://api:8000
+      ENV: production
+    ports:
+      - "8501:8501"
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8501/_stcore/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 20s
+    depends_on:
+      api:
+        condition: service_healthy
+    deploy:
+      resources:
+        limits:
+          memory: 512M
+    restart: always
+    logging: *default-logging
+
+  # ── Prometheus ─────────────────────────────────────────────
+  prometheus:
+    image: prom/prometheus:v2.51.0
+    volumes:
+      - ./monitoring/prometheus.yml:/etc/prometheus/prometheus.yml:ro
+      - prometheus_data:/prometheus
+    command:
+      - "--config.file=/etc/prometheus/prometheus.yml"
+      - "--storage.tsdb.retention.time=${PROMETHEUS_RETENTION:-30d}"
+    deploy:
+      resources:
+        limits:
+          memory: 512M
+    restart: always
+    logging: *default-logging
+    # No port exposed — accessed via Grafana
+
+  # ── Grafana ────────────────────────────────────────────────
+  grafana:
+    image: grafana/grafana:10.4.2
+    env_file:
+      - envs/.env.prod
+    environment:
+      GF_SECURITY_ADMIN_PASSWORD: ${GRAFANA_ADMIN_PASSWORD}
+      GF_USERS_ALLOW_SIGN_UP: "false"
+      GF_SECURITY_DISABLE_GRAVATAR: "true"
+    volumes:
+      - grafana_data:/var/lib/grafana
+      - ./monitoring/grafana/provisioning:/etc/grafana/provisioning:ro
+      - ./monitoring/grafana/dashboards:/etc/grafana/dashboards:ro
+    ports:
+      - "3000:3000"
+    depends_on:
+      - prometheus
+    deploy:
+      resources:
+        limits:
+          memory: 256M
+    restart: always
+    logging: *default-logging
+
+  # ── Node Exporter (system metrics) ────────────────────────
+  node-exporter:
+    image: prom/node-exporter:v1.7.0
+    deploy:
+      resources:
+        limits:
+          memory: 128M
+    restart: always
+    logging: *default-logging
+    # No port exposed — scraped by Prometheus internally
+
+volumes:
+  postgres_data:
+  mlflow_data:
+  grafana_data:
+  airflow_logs:
+  airflow_data:
+  airflow_models:
+  airflow_reports:
+  prometheus_data:
