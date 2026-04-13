@@ -8,7 +8,7 @@ dependencies = [
     "pandas",
     "numpy",
     "scikit-learn",
-    "mlflow>=2.11",
+    "mlflow>=3.11.1",
     "fastapi",
     "uvicorn",
     "joblib",
